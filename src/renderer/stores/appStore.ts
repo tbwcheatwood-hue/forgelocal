@@ -1,5 +1,11 @@
 import { create } from 'zustand'
 import { canRunMultiAgent, normalizeAgentTeam, type AgentRole } from '@shared/agents'
+import {
+  buildUserMessageContent,
+  contentToPlainText,
+  prepareAttachmentContext,
+  type ComposerAttachment
+} from '@shared/attachments'
 import type {
   CompanionHealth,
   CompanionPairResult,
@@ -42,6 +48,7 @@ interface AppState {
   openFiles: OpenFile[]
   activePath: string | null
   selectedContext: string[]
+  composerAttachments: ComposerAttachment[]
   lmStatus: LmConnectionResult | null
   models: LmModel[]
   session: ChatSession | null
@@ -91,6 +98,11 @@ interface AppState {
   updateFileContent: (path: string, content: string) => void
   saveActive: () => Promise<void>
   toggleContext: (path: string) => void
+  addComposerAttachments: (attachments: ComposerAttachment[]) => void
+  removeComposerAttachment: (id: string) => void
+  clearComposerAttachments: () => void
+  pickComposerAttachments: () => Promise<void>
+  ingestDroppedFiles: (files: File[]) => Promise<void>
   refreshLm: () => Promise<void>
   selectModel: (model: string) => Promise<void>
   sendPrompt: (prompt: string) => Promise<void>
@@ -171,6 +183,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   openFiles: [],
   activePath: null,
   selectedContext: [],
+  composerAttachments: [],
   lmStatus: null,
   models: [],
   session: null,
@@ -330,6 +343,66 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
+  addComposerAttachments: (attachments) => {
+    const merged = [...get().composerAttachments]
+    for (const a of attachments) {
+      if (!merged.some((m) => m.id === a.id)) merged.push(a)
+    }
+    set({ composerAttachments: merged.slice(0, 8) })
+  },
+
+  removeComposerAttachment: (id) => {
+    set({ composerAttachments: get().composerAttachments.filter((a) => a.id !== id) })
+  },
+
+  clearComposerAttachments: () => set({ composerAttachments: [] }),
+
+  pickComposerAttachments: async () => {
+    try {
+      const result = await window.forge.pickAttachments()
+      if (!result.ok) {
+        set({ error: result.error })
+        return
+      }
+      if (result.attachments.length) {
+        get().addComposerAttachments(result.attachments)
+        const warns = result.attachments.map((a) => a.warning).filter(Boolean)
+        if (warns.length) set({ error: warns[0] ?? null })
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  ingestDroppedFiles: async (files) => {
+    if (!files.length) return
+    try {
+      const payloads: Array<{ name: string; mimeType?: string; dataBase64: string }> = []
+      for (const file of files) {
+        const buf = await file.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        let binary = ''
+        const chunk = 0x8000
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+        }
+        payloads.push({
+          name: file.name,
+          mimeType: file.type || undefined,
+          dataBase64: btoa(binary)
+        })
+      }
+      const result = await window.forge.ingestAttachmentBuffers(payloads)
+      if (!result.ok) {
+        set({ error: result.error })
+        return
+      }
+      get().addComposerAttachments(result.attachments)
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
   refreshLm: async () => {
     try {
       const result = await window.forge.testLm()
@@ -392,14 +465,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
 
+    const attachments = [...get().composerAttachments]
+    const preparedAttachments = prepareAttachmentContext(attachments, settings.provider.model)
+    const userContent = buildUserMessageContent(size.text, preparedAttachments)
+    const displayContent = contentToPlainText(userContent)
+
     const requestId = await window.forge.newId()
     const session = get().session ?? emptySession(get().workspaceRoot ?? undefined)
     const userMsg: ChatMessage = {
       id: await window.forge.newId(),
       role: 'user',
-      content: size.text,
+      content: displayContent,
       createdAt: Date.now(),
-      contextFiles: [...get().selectedContext]
+      contextFiles: [...get().selectedContext],
+      attachmentNames: attachments.map((a) => a.name)
     }
 
     const openFiles = get().openFiles
@@ -415,7 +494,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       {
         contextWindowTokens: provider.contextWindowTokens,
         maxOutputTokens: provider.maxOutputTokens ?? 4096,
-        reservedPromptTokens: Math.ceil(size.text.length / 4)
+        reservedPromptTokens: Math.ceil(displayContent.length / 4)
       }
     )
     const contextFiles = preparedContext.files
@@ -437,13 +516,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       ]
     }
 
+    const attachWarn =
+      preparedAttachments.warnings[0] ??
+      (preparedAttachments.skippedImages.length
+        ? `Image(s) not sent as vision: ${preparedAttachments.skippedImages.join(', ')}`
+        : null)
+
     set({
       session: nextSession,
       streaming: true,
       streamBuffer: '',
       requestId,
       activeAgentName: useMulti ? enabledAgentsLabel(team.agents) : null,
-      error: size.message ?? preparedContext.message ?? null
+      composerAttachments: [],
+      error: size.message ?? preparedContext.message ?? attachWarn
     })
 
     let liveBuffer = ''
@@ -503,10 +589,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       const history = nextSession.messages
         .filter((m) => m.id !== assistantId)
         .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content
-        }))
+        .map((m) => {
+          if (m.id === userMsg.id) {
+            return {
+              role: 'user' as const,
+              content: userContent
+            }
+          }
+          return {
+            role: m.role as 'user' | 'assistant',
+            content: m.content
+          }
+        })
 
       let finalContent = ''
       let proposedEdits: ProposedEdit[] = []
@@ -516,7 +610,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         const teamResult = await window.forge.runTeam({
           requestId,
           messages: history,
-          contextFiles
+          contextFiles,
+          attachmentText: preparedAttachments.textBlocks.join('\n\n') || undefined
         })
         finalContent = teamResult.content || liveBuffer || get().streamBuffer
         proposedEdits = teamResult.proposedEdits

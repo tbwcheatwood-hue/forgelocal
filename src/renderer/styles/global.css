@@ -530,6 +530,14 @@ select:focus-visible,
   flex-direction: column;
   gap: 10px;
   background: rgba(10, 9, 8, 0.7);
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.chat-composer.drop-active {
+  box-shadow: inset 0 0 0 1px rgba(224, 160, 106, 0.55);
+  background: rgba(224, 160, 106, 0.06);
 }
 
 .chat-composer textarea {
@@ -583,6 +591,15 @@ select:focus-visible,
 
 .composer-hint.warn {
   color: var(--warning);
+}
+
+.attach-chips .attach-chip.kind-image {
+  border-color: rgba(94, 234, 212, 0.35);
+}
+
+.attach-chips .attach-chip.kind-pdf,
+.attach-chips .attach-chip.kind-docx {
+  border-color: rgba(224, 160, 106, 0.4);
 }
 
 /* ——— Diff ——— */

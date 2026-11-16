@@ -1,3 +1,4 @@
+import { estimateContentTokens, type ChatMessageContent } from './attachments'
 import type { ChatCompletionRequest, ProviderMode, ProviderSettings } from './types'
 import { isRemoteMode } from './providerTools'
 
@@ -7,8 +8,10 @@ export function estimateTokensFromText(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
-export function estimateMessagesTokens(messages: Array<{ content: string }>): number {
-  return messages.reduce((n, m) => n + estimateTokensFromText(m.content ?? ''), 0)
+export function estimateMessagesTokens(
+  messages: Array<{ content: string | ChatMessageContent }>
+): number {
+  return messages.reduce((n, m) => n + estimateContentTokens(m.content ?? ''), 0)
 }
 
 /**
@@ -32,7 +35,7 @@ export function isLikelyEmbeddingModelId(modelId: string): boolean {
 }
 
 export interface ChatBudgetInput {
-  messages: Array<{ content: string }>
+  messages: Array<{ content: string | ChatMessageContent }>
   maxOutputTokens: number
   contextWindowTokens: number
 }

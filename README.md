@@ -27,6 +27,7 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 - [MCP dock](#mcp-dock)
 - [Multi-agent teaming](#multi-agent-teaming)
 - [Companion bridge](#companion-bridge)
+- [Chat attachments](#chat-attachments)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Token & chat payload parameters](#token--chat-payload-parameters)
 - [Offline behavior](#offline-behavior)
@@ -51,6 +52,7 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 | **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                      |
 | **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model)       |
 | **Companion** | Optional LocalForge Companion bridge, provider discovery, hardware inventory, git snapshot, preview |
+| **Attach**    | PDF / docx / images / text as composer context (vision when the model supports it)                  |
 | **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry       |
 
 The IDE stays in the **main window** (there is no pop-out IDE).
@@ -300,12 +302,26 @@ ForgeLocal does **not** replace its own filesystem with the companion — local 
 
 ---
 
+## Chat attachments
+
+The assistant composer accepts **non-code** files alongside the existing `+` open-file context chips:
+
+| Kind                  | Behavior                                                                                                                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PDF / DOCX / text** | Text is extracted locally (size-capped) and sent as prompt context. Scanned PDFs with no text layer get an honest “no OCR” note — ForgeLocal does not invent OCR.                |
+| **Images**            | Encoded as OpenAI-compatible `image_url` data URLs when the selected model looks vision-capable (llava, gpt-4o, qwen-vl, …). Otherwise a clear fallback explains the limitation. |
+| **Other binaries**    | Listed with a “no extractor” note — convert or paste text.                                                                                                                       |
+
+Use **Attach** / **Browse**, or drag-and-drop onto the composer. Per-file and batch size limits apply; paths outside the workspace need the Settings outside-workspace toggle. Attachment bytes are not written into saved chat history (names only). Multi-agent runs use extracted text (not vision pixels).
+
+---
+
 ## End-to-end workflow
 
 1. **Open a project** (Welcome → Open project, or File → Open Project).
 2. Connect LM Studio and pick a model.
 3. Open files; mark context with `+` in the file tree (nothing else is sent).
-4. Prompt in the Assistant panel (`Ctrl/⌘ + Enter`). Optional: enable **Multi-agent** for a sequential team run.
+4. Prompt in the Assistant panel (`Ctrl/⌘ + Enter`). Optional: **Attach** PDF/docx/images, or enable **Multi-agent** for a sequential team run.
 5. Review proposed diffs → **Accept** (writes after confirm) or **Reject**.
 6. AI shell suggestions appear as **Command Cards** and need explicit approval before running.
 

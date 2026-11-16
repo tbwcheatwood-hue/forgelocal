@@ -11,9 +11,11 @@ import { checkPromptSize, prepareContextFiles, PROMPT_MAX_CHARS } from '../../sh
 import type { McpServerConfig } from '../../shared/mcp'
 import { validateMcpServerConfig } from '../../shared/mcp'
 import { normalizeAgentTeam } from '../../shared/agents'
+import { contentToPlainText } from '../../shared/attachments'
 import { normalizeCompanionBridge } from '../../shared/companion'
 import { discoverProviders } from '../../shared/providersDiscover'
 import { AgentsService } from '../services/agents'
+import { AttachmentsService } from '../services/attachments'
 import { CatalogService } from '../services/catalog'
 import { CompanionService } from '../services/companion'
 import { parseProposedEdits } from '../services/edits'
@@ -35,6 +37,7 @@ export interface Services {
   agents: AgentsService
   companion: CompanionService
   preview: PreviewService
+  attachments: AttachmentsService
 }
 
 function applySettingsSideEffects(
@@ -51,7 +54,17 @@ function applySettingsSideEffects(
 }
 
 export function registerIpc(services: Services): void {
-  const { fs: fileService, settings, lm, catalog, mcp, agents, companion, preview } = services
+  const {
+    fs: fileService,
+    settings,
+    lm,
+    catalog,
+    mcp,
+    agents,
+    companion,
+    preview,
+    attachments
+  } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
   ipcMain.handle('settings:update', (_e, partial: Partial<AppSettings>) => {
@@ -103,6 +116,56 @@ export function registerIpc(services: Services): void {
     return lm.listModels(provider)
   })
 
+  ipcMain.handle('attachments:pick', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win ?? undefined!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: 'Documents & images',
+          extensions: [
+            'png',
+            'jpg',
+            'jpeg',
+            'gif',
+            'webp',
+            'pdf',
+            'docx',
+            'txt',
+            'md',
+            'csv',
+            'json'
+          ]
+        },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || !result.filePaths.length) {
+      return { ok: true as const, attachments: [] }
+    }
+    const current = settings.getSettings()
+    return attachments.ingestPaths(
+      result.filePaths,
+      fileService.workspaceRoot,
+      current.allowPathsOutsideWorkspace
+    )
+  })
+
+  ipcMain.handle('attachments:ingestPaths', async (_e, paths: string[]) => {
+    const current = settings.getSettings()
+    return attachments.ingestPaths(
+      paths ?? [],
+      fileService.workspaceRoot,
+      current.allowPathsOutsideWorkspace
+    )
+  })
+
+  ipcMain.handle(
+    'attachments:ingestBuffers',
+    async (_e, files: Array<{ name: string; mimeType?: string; dataBase64: string }>) =>
+      attachments.ingestBuffers(files ?? [])
+  )
+
   ipcMain.handle(
     'lm:chat',
     async (
@@ -116,15 +179,20 @@ export function registerIpc(services: Services): void {
       const provider = settings.getSettings().provider
 
       const normalizedMessages = (payload.messages ?? []).map((m) => {
-        const content = typeof m.content === 'string' ? m.content : ''
-        const check = checkPromptSize(content)
+        const plain = contentToPlainText(m.content ?? '')
+        const check = checkPromptSize(plain)
         if (!check.ok && m.role === 'user') {
           throw new Error(check.message ?? `Message exceeds ${PROMPT_MAX_CHARS} characters`)
         }
-        return {
-          role: m.role,
-          content: content.length > PROMPT_MAX_CHARS ? content.slice(0, PROMPT_MAX_CHARS) : content
+        if (typeof m.content === 'string') {
+          return {
+            role: m.role,
+            content:
+              m.content.length > PROMPT_MAX_CHARS ? m.content.slice(0, PROMPT_MAX_CHARS) : m.content
+          }
         }
+        // Multimodal: keep parts; size already validated via plain text length.
+        return { role: m.role, content: m.content }
       })
 
       const prepared = prepareContextFiles(payload.contextFiles ?? [])
@@ -202,6 +270,7 @@ export function registerIpc(services: Services): void {
         requestId: string
         messages: ChatCompletionRequest['messages']
         contextFiles: Array<{ relativePath: string; path: string; content: string }>
+        attachmentText?: string
       }
     ) => {
       const current = settings.getSettings()
@@ -216,11 +285,13 @@ export function registerIpc(services: Services): void {
       }
 
       const prepared = prepareContextFiles(payload.contextFiles ?? [])
-      const contextBlock = prepared.files.length
+      const fileBlock = prepared.files.length
         ? prepared.files.map((f) => `--- ${f.relativePath} ---\n${f.content}`).join('\n\n')
         : ''
-      const userGoal =
-        [...(payload.messages ?? [])].reverse().find((m) => m.role === 'user')?.content ?? ''
+      const attachBlock = (payload.attachmentText ?? '').trim()
+      const contextBlock = [fileBlock, attachBlock].filter(Boolean).join('\n\n')
+      const lastUser = [...(payload.messages ?? [])].reverse().find((m) => m.role === 'user')
+      const userGoal = contentToPlainText(lastUser?.content ?? '')
 
       const send = (chunk: import('../../shared/types').StreamChunk) => {
         try {
