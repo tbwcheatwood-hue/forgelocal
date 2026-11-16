@@ -43,19 +43,20 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 
 ## What you get
 
-| Area          | What it does                                                                                        |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| **IDE**       | Monaco editor with tabs, file tree, search, and Command Cards for approved shell commands           |
-| **Assistant** | Chat against LM Studio (or a remote OpenAI-compatible API you configure)                            |
-| **Context**   | You mark files with `+` — only those files are attached                                             |
-| **Diffs**     | Proposed edits appear as Accept / Reject reviews (ghost layer + assistant cards)                    |
-| **Canvas**    | Optional infinite map of the workspace with a focus lens                                            |
-| **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                      |
-| **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model)       |
-| **Companion** | Optional LocalForge Companion bridge, provider discovery, hardware inventory, git snapshot, preview |
-| **Attach**    | PDF / docx / images / text as composer context (vision when the model supports it)                  |
-| **Generate**  | NL → plan → starter project (LM Studio when available, offline templates as honest fallback)        |
-| **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry       |
+| Area          | What it does                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| **IDE**       | Monaco editor with tabs, file tree, search, and Command Cards for approved shell commands             |
+| **Assistant** | Chat against LM Studio (or a remote OpenAI-compatible API you configure)                              |
+| **Context**   | You mark files with `+` — only those files are attached                                               |
+| **Diffs**     | Proposed edits appear as Accept / Reject reviews (ghost layer + assistant cards)                      |
+| **Canvas**    | Optional infinite map of the workspace with a focus lens                                              |
+| **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                        |
+| **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model)         |
+| **Companion** | Optional LocalForge Companion bridge, provider discovery, hardware inventory, git snapshot, preview   |
+| **Attach**    | PDF / docx / images / text as composer context (vision when the model supports it)                    |
+| **Generate**  | NL Send → plan → runnable project + preview (LM Studio when available; offline templates as fallback) |
+| **Layout**    | Dockable Explorer / Editor / Preview / AI / Console — drag, resize, minimize, persist, reset          |
+| **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry         |
 
 The IDE stays in the **main window** (there is no pop-out IDE).
 
@@ -306,15 +307,15 @@ ForgeLocal does **not** replace its own filesystem with the companion — local 
 
 ## AI project generator
 
-ForgeLocal can turn a short natural-language goal into a **working starter project**, then keep polishing it in the same IDE (chat, diffs, multi-agent, companion, attachments).
+ForgeLocal can turn a short natural-language goal into a **working starter project**, then keep polishing it in the same IDE (chat, diffs, multi-agent, companion, attachments). The **running app** (Preview) is the primary result; the editor is for inspection and refinement.
 
-1. **Welcome → New AI project** (or File → New AI Project / TitleBar **New**), **or** type a greenfield prompt in chat like “build me a new weather app” — ForgeLocal opens this wizard instead of editing the open workspace.
-2. Describe the goal and pick a stack hint: **static web**, **vanilla SPA**, or **Node CLI**.
-3. **Plan** with your loaded LM Studio / remote model (JSON plan). If the model is offline or returns unusable JSON, ForgeLocal uses an **offline template** and says so — no fake cloud service.
-4. Answer clarifying questions when the planner asks; review the file list; **Create in ~/ForgeLocalProjects** or **Choose folder…**.
-5. Inside a workspace: TitleBar **Project** / dock **Project** → **Checkpoint** (stored under `.forgelocal/checkpoints`), **Restore**, or **Export zip**.
+1. **Welcome Send** or chat Send with a greenfield prompt (“build me a new weather app”) — ForgeLocal **plans inline**, shows progress in chat, writes under **~/ForgeLocalProjects**, opens the project, and **starts preview** for static-web / vanilla-spa. Node CLI gets an honest “no browser preview” status — use Console.
+2. Ambiguous goals ask clarifying questions (wizard). TitleBar **New** still opens the full planner for manual control.
+3. **Plan** uses your LM Studio / remote model (JSON). If the model is offline or returns unusable JSON, ForgeLocal uses an **offline template** and says so — no fake cloud service.
+4. Follow-ups in chat edit the open project as **reviewable diffs**; Accept refreshes a live preview.
+5. Inside a workspace: TitleBar **Project** / dock **Project** → **Checkpoint** (`.forgelocal/checkpoints`), **Restore**, or **Export zip**. Drag panel titles to re-dock Explorer / Editor / Preview / AI / Console; **Layout** or Alt+Shift+R resets.
 
-Generated projects remember a small `.forgelocal/project.json` and appear under Welcome → Generated. Chat remains for edits inside an open project (attach context with `+`).
+Generated projects remember `.forgelocal/project.json` and appear under Welcome → Generated.
 
 ---
 
@@ -334,13 +335,13 @@ Use **Attach** / **Browse**, or drag-and-drop onto the composer. Per-file and ba
 
 ## End-to-end workflow
 
-1. **New AI project** or **Open a project** (Welcome, or File menu).
-2. Connect LM Studio and pick a model.
-3. Open files; mark context with `+` in the file tree (nothing else is sent).
-4. Prompt in the Assistant panel (`Ctrl/⌘ + Enter`). Optional: **Attach** PDF/docx/images, or enable **Multi-agent** for a sequential team run.
-5. Review proposed diffs → **Accept** (writes after confirm) or **Reject**.
+1. On Welcome, describe an app and press **Send** (or open an existing project).
+2. Watch plan → files under ~/ForgeLocalProjects → Preview (when the stack allows).
+3. Connect LM Studio for AI edits; mark context with `+` (nothing else is sent).
+4. Prompt follow-ups in the Assistant panel (`Ctrl/⌘ + Enter`). Optional: **Attach** PDF/docx/images, or **Multi-agent**.
+5. Review proposed diffs → **Accept** (writes after confirm; refreshes preview) or **Reject**.
 6. AI shell suggestions appear as **Command Cards** and need explicit approval before running.
-7. Optional: **Project** panel → checkpoint / restore / export zip.
+7. Optional: **Project** panel → checkpoint / restore / export zip; rearrange dockable panels as needed.
 
 Optional polish (catalog tools, enabled by default for a gift experience):
 

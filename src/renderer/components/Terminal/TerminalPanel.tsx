@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { ToolDock } from '../Layout/ToolDock'
 
-export function TerminalPanel() {
+export function TerminalPanel({ forceShow = false }: { forceShow?: boolean }) {
   const showTerminal = useAppStore((s) => s.showTerminal)
   const terminalLog = useAppStore((s) => s.terminalLog)
   const pendingCommand = useAppStore((s) => s.pendingCommand)
@@ -28,7 +28,6 @@ export function TerminalPanel() {
         e.preventDefault()
         void approveCommand()
       } else if (e.key === 'Escape' && !(e.target as HTMLElement)?.closest?.('.ghost-layer')) {
-        // Ghost layer owns Esc when present; still allow reject here if focus is terminal
         if ((e.target as HTMLElement)?.closest?.('.terminal-panel')) {
           e.preventDefault()
           rejectCommand()
@@ -39,13 +38,15 @@ export function TerminalPanel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [pendingCommand, approveCommand, rejectCommand])
 
-  if (!showTerminal) {
+  const visible = forceShow || showTerminal
+
+  if (!visible) {
     return <ToolDock />
   }
 
   return (
-    <div className="terminal-stack">
-      <div className="terminal-panel" role="region" aria-label="Terminal">
+    <div className={`terminal-stack${forceShow ? ' embedded' : ''}`}>
+      <div className="terminal-panel" role="region" aria-label="Console">
         <div className="terminal-toolbar">
           <strong>Command Cards</strong>
           <input
@@ -82,7 +83,7 @@ export function TerminalPanel() {
           {terminalLog || 'Ready. AI shell suggestions appear as glass command cards.'}
         </div>
       </div>
-      <ToolDock />
+      {!forceShow && <ToolDock />}
     </div>
   )
 }
