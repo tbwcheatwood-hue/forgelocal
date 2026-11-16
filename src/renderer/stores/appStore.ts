@@ -11,6 +11,11 @@ import type {
   ProposedEdit
 } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
+import {
+  checkPromptSize,
+  prepareContextFiles,
+  STREAM_UI_MIN_INTERVAL_MS
+} from '@shared/messageLimits'
 import { detectLanguage } from '../lib/language'
 
 interface PendingCommand {
@@ -330,29 +335,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     const trimmed = prompt.trim()
     if (!trimmed || get().streaming) return
 
+    const size = checkPromptSize(trimmed)
+    if (!size.ok) {
+      set({ error: size.message ?? 'Prompt is too large to send safely.' })
+      return
+    }
+
     const requestId = await window.forge.newId()
     const session = get().session ?? emptySession(get().workspaceRoot ?? undefined)
     const userMsg: ChatMessage = {
       id: await window.forge.newId(),
       role: 'user',
-      content: trimmed,
+      content: size.text,
       createdAt: Date.now(),
       contextFiles: [...get().selectedContext]
     }
 
     const openFiles = get().openFiles
-    const contextFiles = openFiles
-      .filter((f) => get().selectedContext.includes(f.path))
-      .map((f) => ({
-        path: f.path,
-        relativePath: f.relativePath,
-        content: f.content
-      }))
+    const preparedContext = prepareContextFiles(
+      openFiles
+        .filter((f) => get().selectedContext.includes(f.path))
+        .map((f) => ({
+          path: f.path,
+          relativePath: f.relativePath,
+          content: f.content
+        }))
+    )
+    const contextFiles = preparedContext.files
 
     const assistantId = await window.forge.newId()
     const nextSession: ChatSession = {
       ...session,
-      title: session.messages.length ? session.title : trimmed.slice(0, 48),
+      title: session.messages.length ? session.title : size.text.slice(0, 48),
       updatedAt: Date.now(),
       messages: [
         ...session.messages,
@@ -371,22 +385,53 @@ export const useAppStore = create<AppState>((set, get) => ({
       streaming: true,
       streamBuffer: '',
       requestId,
-      error: null
+      error: size.message ?? preparedContext.message ?? null
     })
+
+    let liveBuffer = ''
+    let lastUiFlush = 0
+    let pendingBuffer: string | null = null
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+    const paintStream = (buffer: string) => {
+      set({
+        streamBuffer: buffer,
+        session: {
+          ...get().session!,
+          messages: get().session!.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: buffer } : m
+          )
+        }
+      })
+    }
+
+    const flushStreamUi = (buffer: string, force = false) => {
+      const now = Date.now()
+      if (!force && now - lastUiFlush < STREAM_UI_MIN_INTERVAL_MS) {
+        pendingBuffer = buffer
+        if (!flushTimer) {
+          flushTimer = setTimeout(() => {
+            flushTimer = null
+            if (pendingBuffer != null) {
+              const latest = pendingBuffer
+              pendingBuffer = null
+              lastUiFlush = Date.now()
+              paintStream(latest)
+            }
+          }, STREAM_UI_MIN_INTERVAL_MS)
+        }
+        return
+      }
+      lastUiFlush = now
+      pendingBuffer = null
+      paintStream(buffer)
+    }
 
     const unsub = window.forge.onChatChunk(({ requestId: id, chunk }) => {
       if (id !== requestId) return
       if (chunk.type === 'delta' && chunk.content) {
-        const buffer = get().streamBuffer + chunk.content
-        set({
-          streamBuffer: buffer,
-          session: {
-            ...get().session!,
-            messages: get().session!.messages.map((m) =>
-              m.id === assistantId ? { ...m, content: buffer } : m
-            )
-          }
-        })
+        liveBuffer += chunk.content
+        flushStreamUi(liveBuffer)
       }
     })
 
@@ -405,6 +450,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         contextFiles
       })
 
+      if (flushTimer) {
+        clearTimeout(flushTimer)
+        flushTimer = null
+      }
+
+      const finalContent = result.content || liveBuffer || get().streamBuffer
       const finalSession: ChatSession = {
         ...get().session!,
         updatedAt: Date.now(),
@@ -412,7 +463,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           m.id === assistantId
             ? {
                 ...m,
-                content: result.content || get().streamBuffer,
+                content: finalContent,
                 proposedEdits: result.proposedEdits
               }
             : m
@@ -420,18 +471,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       set({
         session: finalSession,
+        streamBuffer: finalContent,
         streaming: false,
         requestId: null,
         ghostIndex: 0,
-        showAi: true
+        showAi: true,
+        error: preparedContext.message ?? null
       })
-      await window.forge.saveChatSession(finalSession)
+      try {
+        await window.forge.saveChatSession(finalSession)
+      } catch (persistErr) {
+        set({
+          error:
+            persistErr instanceof Error
+              ? persistErr.message
+              : 'Chat completed but history could not be saved.'
+        })
+      }
 
-      const cmdMatch = result.content.match(/```(?:bash|sh|shell)\n([\s\S]*?)```/i)
+      const cmdMatch = finalContent.match(/```(?:bash|sh|shell)\n([\s\S]*?)```/i)
       if (cmdMatch && get().settings.enabledTools['builtin-terminal'] !== false) {
         get().proposeCommand(cmdMatch[1].trim(), 'Suggested by AI response')
       }
     } catch (err) {
+      if (flushTimer) {
+        clearTimeout(flushTimer)
+        flushTimer = null
+      }
       const message = err instanceof Error ? err.message : String(err)
       set({
         streaming: false,
@@ -439,7 +505,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         session: {
           ...get().session!,
           messages: get().session!.messages.map((m) =>
-            m.id === assistantId ? { ...m, error: message, content: m.content || message } : m
+            m.id === assistantId
+              ? { ...m, error: message, content: m.content || liveBuffer || message }
+              : m
           )
         },
         error: message

@@ -13,6 +13,7 @@ import {
   disableRemoteOnlyTools,
   isRemoteMode
 } from '../../shared/providerTools'
+import { checkPromptSize, prepareContextFiles, PROMPT_MAX_CHARS } from '../../shared/messageLimits'
 import { CatalogService } from '../services/catalog'
 import { parseProposedEdits } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
@@ -142,6 +143,20 @@ export function registerIpc(services: Services): void {
       }
     ) => {
       const provider = settings.getSettings().provider
+
+      const normalizedMessages = (payload.messages ?? []).map((m) => {
+        const content = typeof m.content === 'string' ? m.content : ''
+        const check = checkPromptSize(content)
+        if (!check.ok && m.role === 'user') {
+          throw new Error(check.message ?? `Message exceeds ${PROMPT_MAX_CHARS} characters`)
+        }
+        return {
+          role: m.role,
+          content: content.length > PROMPT_MAX_CHARS ? content.slice(0, PROMPT_MAX_CHARS) : content
+        }
+      })
+
+      const prepared = prepareContextFiles(payload.contextFiles ?? [])
       const systemParts = [
         isRemoteMode(provider)
           ? 'You are ForgeLocal, a coding assistant using a user-configured remote OpenAI-compatible model.'
@@ -150,16 +165,17 @@ export function registerIpc(services: Services): void {
         'When proposing file edits, use fenced code blocks headed with: // file: relative/path',
         'Do not claim to have written files; the user must accept diffs.'
       ]
-      if (payload.contextFiles.length) {
+      if (prepared.message) systemParts.push(prepared.message)
+      if (prepared.files.length) {
         systemParts.push('Attached context files:')
-        for (const file of payload.contextFiles) {
+        for (const file of prepared.files) {
           systemParts.push(`--- ${file.relativePath} ---\n${file.content}`)
         }
       }
 
       const messages: ChatCompletionRequest['messages'] = [
         { role: 'system', content: systemParts.join('\n\n') },
-        ...payload.messages
+        ...normalizedMessages
       ]
 
       let full = ''
@@ -169,11 +185,15 @@ export function registerIpc(services: Services): void {
         { messages, model: provider.model, stream: provider.stream },
         (chunk) => {
           if (chunk.type === 'delta' && chunk.content) full += chunk.content
-          event.sender.send('lm:chunk', { requestId: payload.requestId, chunk })
+          try {
+            event.sender.send('lm:chunk', { requestId: payload.requestId, chunk })
+          } catch {
+            // Sender may be gone if the window closed mid-stream.
+          }
         }
       )
 
-      const proposedEdits = parseProposedEdits(full, payload.contextFiles)
+      const proposedEdits = parseProposedEdits(full, prepared.files)
       return { content: full, proposedEdits }
     }
   )
@@ -229,7 +249,15 @@ export function registerIpc(services: Services): void {
   ipcMain.handle('window:getPopoutBootstrap', () => popoutBootstrap)
 
   ipcMain.handle('chat:sessions', () => settings.getChatSessions())
-  ipcMain.handle('chat:save', (_e, session) => settings.saveChatSession(session))
+  ipcMain.handle('chat:save', (_e, session) => {
+    try {
+      return settings.saveChatSession(session)
+    } catch (err) {
+      throw new Error(
+        `Chat history was not saved (${err instanceof Error ? err.message : String(err)}). Your in-memory conversation is still available.`
+      )
+    }
+  })
   ipcMain.handle('chat:delete', (_e, id: string) => settings.deleteChatSession(id))
 
   ipcMain.handle(

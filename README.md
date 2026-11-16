@@ -100,14 +100,15 @@ npm run package
 
 ### Troubleshooting
 
-| Symptom                        | Likely cause                                       |
-| ------------------------------ | -------------------------------------------------- |
-| `stopped` / connection refused | LM Studio not running or server not started        |
-| `unreachable` / timeout        | Wrong port/base URL, firewall, or hung server      |
-| `no-model`                     | Server up but no model loaded                      |
-| Remote missing API key         | Remote mode requires a key in Settings             |
-| Online tools hidden/disabled   | Local mode active or no remote model selected      |
-| HTTP errors from chat          | Incompatible model, unloaded model, or bad request |
+| Symptom                        | Likely cause                                                                                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `stopped` / connection refused | LM Studio not running or server not started                                                    |
+| `unreachable` / timeout        | Wrong port/base URL, firewall, or hung server                                                  |
+| `no-model`                     | Server up but no model loaded                                                                  |
+| Remote missing API key         | Remote mode requires a key in Settings                                                         |
+| Online tools hidden/disabled   | Local mode active or no remote model selected                                                  |
+| HTTP errors from chat          | Incompatible model, unloaded model, or bad request                                             |
+| Huge paste / prompt “crashes”  | Soft-warns ~24k chars; hard-blocks over 100k; context/history truncated for IPC + store safety |
 
 ## End-to-end flow
 

@@ -2,6 +2,33 @@ import { useMemo, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { DiffReview } from '../DiffReview/DiffReview'
 import { isRemoteMode } from '@shared/providerTools'
+import {
+  estimateWordCount,
+  PROMPT_MAX_CHARS,
+  PROMPT_SOFT_CHARS,
+  UI_MESSAGE_COLLAPSE_CHARS
+} from '@shared/messageLimits'
+
+function MessageBody({ content, streaming }: { content: string; streaming: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const text = content || (streaming ? '…' : '')
+  const needsCollapse = text.length > UI_MESSAGE_COLLAPSE_CHARS
+  const shown =
+    !needsCollapse || expanded ? text : `${text.slice(0, UI_MESSAGE_COLLAPSE_CHARS)}\n\n…`
+
+  return (
+    <div className="body">
+      {shown}
+      {needsCollapse && (
+        <div className="msg-collapse">
+          <button className="btn ghost" type="button" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? 'Show less' : `Show more (${text.length.toLocaleString()} chars)`}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function ChatPanel() {
   const [prompt, setPrompt] = useState('')
@@ -26,6 +53,17 @@ export function ChatPanel() {
 
   const disconnected = !lmStatus || lmStatus.status !== 'connected'
   const remote = isRemoteMode(settings.provider)
+  const promptChars = prompt.length
+  const promptWords = estimateWordCount(prompt)
+  const overHard = promptChars > PROMPT_MAX_CHARS
+  const overSoft = promptChars >= PROMPT_SOFT_CHARS
+
+  const submit = async () => {
+    if (!prompt.trim() || streaming || overHard) return
+    const toSend = prompt
+    setPrompt('')
+    await sendPrompt(toSend)
+  }
 
   return (
     <div className="panel ai-panel">
@@ -65,7 +103,7 @@ export function ChatPanel() {
         </label>
       </div>
 
-      <div className="panel-body chat-messages" aria-live="polite">
+      <div className="panel-body chat-messages">
         {!session?.messages.length && (
           <div className="chat-empty">
             <h3>Ask with intent</h3>
@@ -78,7 +116,7 @@ export function ChatPanel() {
         {session?.messages.map((msg) => (
           <div key={msg.id} className={`msg ${msg.role}`}>
             <div className="role">{msg.role}</div>
-            <div className="body">{msg.content || (streaming ? '…' : '')}</div>
+            <MessageBody content={msg.content} streaming={streaming && msg.role === 'assistant'} />
             {msg.error && <div className="error-state">{msg.error}</div>}
             {msg.proposedEdits?.map((edit) => (
               <DiffReview key={edit.id} edit={edit} onDecide={decideEdit} />
@@ -119,21 +157,36 @@ export function ChatPanel() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
-              void sendPrompt(prompt).then(() => setPrompt(''))
+              void submit()
             }
           }}
         />
         <div
           style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}
         >
-          {disconnected ? (
+          {overHard ? (
+            <span className="composer-hint warn">
+              Prompt too large ({promptChars.toLocaleString()} / {PROMPT_MAX_CHARS.toLocaleString()}{' '}
+              chars, ~{promptWords.toLocaleString()} words). Shorten before sending.
+            </span>
+          ) : overSoft ? (
+            <span className="composer-hint warn">
+              Large prompt (~{promptWords.toLocaleString()} words). Still sendable; models may
+              struggle.
+            </span>
+          ) : disconnected ? (
             <span className="composer-hint warn">
               {remote
                 ? 'Connect remote API in Settings (base URL + API key)'
                 : 'Connect LM Studio to send · localhost:1234/v1'}
             </span>
           ) : (
-            <span className="composer-hint">Ctrl/⌘ + Enter to send</span>
+            <span className="composer-hint">
+              Ctrl/⌘ + Enter to send
+              {promptChars > 0
+                ? ` · ${promptChars.toLocaleString()} chars / ~${promptWords.toLocaleString()} words`
+                : ''}
+            </span>
           )}
           {streaming ? (
             <button className="btn danger" onClick={() => cancelPrompt()}>
@@ -142,8 +195,10 @@ export function ChatPanel() {
           ) : (
             <button
               className="btn primary"
-              disabled={!prompt.trim() || disconnected || !settings.provider.model}
-              onClick={() => void sendPrompt(prompt).then(() => setPrompt(''))}
+              disabled={
+                !prompt.trim() || disconnected || !settings.provider.model || overHard || streaming
+              }
+              onClick={() => void submit()}
             >
               Send
             </button>

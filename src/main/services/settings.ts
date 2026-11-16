@@ -1,6 +1,7 @@
 import Store from 'electron-store'
 import type { AppSettings, ChatSession } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
+import { truncateChatSessionForStorage } from '../../shared/messageLimits'
 
 interface StoreSchema {
   settings: AppSettings
@@ -74,12 +75,38 @@ export class SettingsService {
   }
 
   saveChatSession(session: ChatSession): ChatSession[] {
+    const safeSession = truncateChatSessionForStorage(session)
     const sessions = this.getChatSessions()
-    const idx = sessions.findIndex((s) => s.id === session.id)
-    if (idx >= 0) sessions[idx] = session
-    else sessions.unshift(session)
+    const idx = sessions.findIndex((s) => s.id === safeSession.id)
+    if (idx >= 0) sessions[idx] = safeSession
+    else sessions.unshift(safeSession)
     const trimmed = sessions.slice(0, 50)
-    this.store.set('chatSessions', trimmed)
+    try {
+      this.store.set('chatSessions', trimmed)
+    } catch (err) {
+      // Persist failure must not take down the app (oversized JSON / disk errors).
+      const lean = trimmed.map((s) =>
+        truncateChatSessionForStorage({
+          ...s,
+          messages: s.messages.map((m) => ({
+            ...m,
+            content:
+              typeof m.content === 'string' && m.content.length > 8_000
+                ? `${m.content.slice(0, 8_000)}\n\n…[storage fallback truncate]`
+                : m.content,
+            proposedEdits: undefined
+          }))
+        })
+      ) as ChatSession[]
+      try {
+        this.store.set('chatSessions', lean.slice(0, 20))
+        return lean.slice(0, 20)
+      } catch {
+        throw new Error(
+          `Could not save chat history: ${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+    }
     return trimmed
   }
 
