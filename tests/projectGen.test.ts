@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildTemplatePlan,
   inferStackFromDescription,
+  isProjectGenerationIntent,
   normalizePlanPath,
   parseProjectPlan,
   planNeedsQuestions,
@@ -77,5 +78,19 @@ describe('buildTemplatePlan', () => {
     const cli = buildTemplatePlan('My CLI', 'node-cli')
     expect(cli.files.some((f) => f.path === 'bin/cli.js')).toBe(true)
     expect(cli.scripts?.start).toContain('node')
+  })
+})
+
+describe('isProjectGenerationIntent', () => {
+  it('detects greenfield build prompts', () => {
+    expect(isProjectGenerationIntent('Build me a new weather dashboard app')).toBe(true)
+    expect(isProjectGenerationIntent('Create a new static website from scratch')).toBe(true)
+    expect(isProjectGenerationIntent('generate me a node cli tool')).toBe(true)
+  })
+
+  it('ignores ordinary edit/debug prompts', () => {
+    expect(isProjectGenerationIntent('Fix the bug in app.js')).toBe(false)
+    expect(isProjectGenerationIntent('Explain this function')).toBe(false)
+    expect(isProjectGenerationIntent('Refactor the auth module')).toBe(false)
   })
 })

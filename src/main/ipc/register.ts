@@ -1,6 +1,9 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { randomUUID } from 'crypto'
 import { spawn } from 'child_process'
+import { homedir } from 'os'
+import { join } from 'path'
+import { mkdir } from 'fs/promises'
 import type { AppSettings, ChatCompletionRequest, ProposedEdit } from '../../shared/types'
 import {
   assertOnlineToolAllowed,
@@ -206,7 +209,8 @@ export function registerIpc(services: Services): void {
           : 'You are ForgeLocal, a local coding assistant.',
         'Only use the files the user explicitly attached as context.',
         'When proposing file edits, use fenced code blocks headed with: // file: relative/path',
-        'Do not claim to have written files; the user must accept diffs.'
+        'Do not claim to have written files; the user must accept diffs.',
+        'If the user asks to build/create a brand-new app or project from scratch, tell them to use New AI project (or that ForgeLocal will open that wizard) instead of inventing files in the current workspace.'
       ]
       if (prepared.message) systemParts.push(prepared.message)
       if (prepared.files.length) {
@@ -339,8 +343,13 @@ export function registerIpc(services: Services): void {
       if (decision !== 'accepted') {
         throw new Error('Invalid decision')
       }
-      await fileService.writeFile(edit.path, edit.proposedContent)
-      return { ...edit, status: 'accepted' as const }
+      const root = fileService.workspaceRoot
+      const targetPath =
+        root && edit.path && !edit.path.startsWith('/') && !/^[a-zA-Z]:[\\/]/.test(edit.path)
+          ? join(root, edit.relativePath || edit.path)
+          : edit.path
+      await fileService.writeFile(targetPath, edit.proposedContent)
+      return { ...edit, path: targetPath, status: 'accepted' as const }
     }
   )
 
@@ -574,6 +583,12 @@ export function registerIpc(services: Services): void {
     })
     if (result.canceled || !result.filePaths[0]) return null
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('project:defaultParent', async () => {
+    const parent = join(homedir(), 'ForgeLocalProjects')
+    await mkdir(parent, { recursive: true })
+    return parent
   })
 
   ipcMain.handle('project:materialize', async (_e, parentDir: string, plan: ProjectPlan) => {

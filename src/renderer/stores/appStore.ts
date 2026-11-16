@@ -14,7 +14,13 @@ import type {
   HardwareInventory
 } from '@shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
-import type { CheckpointMeta, ProjectPlan, ProjectRecord, ProjectStack } from '@shared/projectGen'
+import {
+  isProjectGenerationIntent,
+  type CheckpointMeta,
+  type ProjectPlan,
+  type ProjectRecord,
+  type ProjectStack
+} from '@shared/projectGen'
 import type {
   AppSettings,
   CatalogItem,
@@ -68,6 +74,7 @@ interface AppState {
   showPreview: boolean
   showProjectWizard: boolean
   showProjectPanel: boolean
+  projectWizardSeed: string | null
   projectPlan: ProjectPlan | null
   projectGenBusy: boolean
   checkpoints: CheckpointMeta[]
@@ -166,15 +173,19 @@ interface AppState {
   refreshGit: () => Promise<void>
   startPreview: (previewDir?: string) => Promise<void>
   stopPreview: () => Promise<void>
-  openProjectWizard: () => void
+  openProjectWizard: (seed?: string) => void
   closeProjectWizard: () => void
+  clearProjectWizardSeed: () => void
   planAiProject: (input: {
     description: string
     answers?: Record<string, string>
     stackHint?: ProjectStack
     preferTemplate?: boolean
   }) => Promise<ProjectPlan | null>
-  materializeAiProject: (plan: ProjectPlan) => Promise<boolean>
+  materializeAiProject: (
+    plan: ProjectPlan,
+    opts?: { useDefaultParent?: boolean }
+  ) => Promise<boolean>
   refreshCheckpoints: () => Promise<void>
   createProjectCheckpoint: (label?: string) => Promise<void>
   restoreProjectCheckpoint: (id: string) => Promise<void>
@@ -225,6 +236,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   showPreview: false,
   showProjectWizard: false,
   showProjectPanel: false,
+  projectWizardSeed: null,
   projectPlan: null,
   projectGenBusy: false,
   checkpoints: [],
@@ -475,6 +487,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   sendPrompt: async (prompt: string) => {
     const trimmed = prompt.trim()
     if (!trimmed || get().streaming) return
+
+    // Greenfield "build me an app" belongs in the project generator — chat diffs
+    // only edit the open workspace and often refuse without attached context.
+    if (isProjectGenerationIntent(trimmed)) {
+      get().openProjectWizard(trimmed)
+      set({
+        error: null,
+        showAi: true
+      })
+      return
+    }
 
     const size = checkPromptSize(trimmed)
     if (!size.ok) {
@@ -1033,8 +1056,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  openProjectWizard: () => set({ showProjectWizard: true, error: null }),
-  closeProjectWizard: () => set({ showProjectWizard: false }),
+  openProjectWizard: (seed) =>
+    set({
+      showProjectWizard: true,
+      projectWizardSeed: seed?.trim() ? seed.trim() : null,
+      error: null
+    }),
+  closeProjectWizard: () => set({ showProjectWizard: false, projectWizardSeed: null }),
+  clearProjectWizardSeed: () => set({ projectWizardSeed: null }),
 
   planAiProject: async (input) => {
     set({ projectGenBusy: true, error: null })
@@ -1059,12 +1088,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  materializeAiProject: async (plan) => {
+  materializeAiProject: async (plan, opts) => {
     set({ projectGenBusy: true, error: null })
     try {
-      const parent = await window.forge.pickProjectParent()
+      let parent: string | null = null
+      if (opts?.useDefaultParent) {
+        parent = await window.forge.defaultProjectParent()
+      } else {
+        parent = await window.forge.pickProjectParent()
+      }
       if (!parent) {
-        set({ projectGenBusy: false })
+        set({
+          projectGenBusy: false,
+          error: opts?.useDefaultParent ? 'Could not resolve default projects folder.' : null
+        })
         return false
       }
       const result = await window.forge.materializeProject(parent, plan)
