@@ -10,6 +10,8 @@ import {
 import { checkPromptSize, prepareContextFiles, PROMPT_MAX_CHARS } from '../../shared/messageLimits'
 import type { McpServerConfig } from '../../shared/mcp'
 import { validateMcpServerConfig } from '../../shared/mcp'
+import { normalizeAgentTeam } from '../../shared/agents'
+import { AgentsService } from '../services/agents'
 import { CatalogService } from '../services/catalog'
 import { parseProposedEdits } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
@@ -24,6 +26,7 @@ export interface Services {
   lm: LmStudioService
   catalog: CatalogService
   mcp: McpService
+  agents: AgentsService
 }
 
 function applySettingsSideEffects(
@@ -40,7 +43,7 @@ function applySettingsSideEffects(
 }
 
 export function registerIpc(services: Services): void {
-  const { fs: fileService, settings, lm, catalog, mcp } = services
+  const { fs: fileService, settings, lm, catalog, mcp, agents } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
   ipcMain.handle('settings:update', (_e, partial: Partial<AppSettings>) => {
@@ -159,6 +162,90 @@ export function registerIpc(services: Services): void {
   )
 
   ipcMain.handle('lm:cancel', (_e, requestId: string) => lm.cancel(requestId))
+
+  ipcMain.handle(
+    'agents:generateTeam',
+    async (
+      event,
+      payload: { requestId: string; description: string }
+    ): Promise<{ ok: true; agents: unknown } | { ok: false; error: string }> => {
+      const provider = settings.getSettings().provider
+      const result = await agents.generateTeam(
+        payload.requestId,
+        provider,
+        payload.description,
+        (chunk) => {
+          try {
+            event.sender.send('lm:chunk', { requestId: payload.requestId, chunk })
+          } catch {
+            /* window gone */
+          }
+        }
+      )
+      return result
+    }
+  )
+
+  ipcMain.handle(
+    'agents:runTeam',
+    async (
+      event,
+      payload: {
+        requestId: string
+        messages: ChatCompletionRequest['messages']
+        contextFiles: Array<{ relativePath: string; path: string; content: string }>
+      }
+    ) => {
+      const current = settings.getSettings()
+      const provider = current.provider
+      const team = normalizeAgentTeam(current.agentTeam)
+      const featureOn = current.enabledTools['optional-multi-agent'] !== false
+      if (!featureOn) {
+        throw new Error('Multi-agent teaming is disabled in the Tools catalog.')
+      }
+      if (!team.enabled) {
+        throw new Error('Multi-agent mode is off. Enable it in the Agents panel.')
+      }
+
+      const prepared = prepareContextFiles(payload.contextFiles ?? [])
+      const contextBlock = prepared.files.length
+        ? prepared.files.map((f) => `--- ${f.relativePath} ---\n${f.content}`).join('\n\n')
+        : ''
+      const userGoal =
+        [...(payload.messages ?? [])].reverse().find((m) => m.role === 'user')?.content ?? ''
+
+      const send = (chunk: import('../../shared/types').StreamChunk) => {
+        try {
+          event.sender.send('lm:chunk', { requestId: payload.requestId, chunk })
+        } catch {
+          /* window gone */
+        }
+      }
+
+      const { content, turns } = await agents.runTeam(
+        payload.requestId,
+        provider,
+        team,
+        userGoal,
+        contextBlock,
+        send
+      )
+      const proposedEdits = parseProposedEdits(content, prepared.files)
+      return {
+        content,
+        proposedEdits,
+        agentRun: {
+          mode: 'multi' as const,
+          turns: turns.map((t) => ({
+            agentId: t.agent.id,
+            agentName: t.agent.name,
+            content: t.content,
+            error: t.error
+          }))
+        }
+      }
+    }
+  )
 
   ipcMain.handle(
     'edits:apply',

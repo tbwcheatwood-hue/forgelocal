@@ -1635,6 +1635,192 @@ select:focus-visible,
   color: var(--text-dim);
 }
 
+/* LocalAGI-inspired Agents panel — scoped only (.lagi-*) */
+.lagi-agents {
+  --lagi-primary: #00ff95;
+  --lagi-secondary: #ff00b1;
+  --lagi-tertiary: #5e00ff;
+  --lagi-bg: #0a0a0a;
+  --lagi-panel: #151515;
+  --lagi-border: rgba(0, 255, 149, 0.45);
+  margin: 8px 10px 0;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(0, 255, 149, 0.06), transparent 40%), var(--lagi-panel);
+  border: 1px solid var(--lagi-border);
+  box-shadow:
+    0 0 0 1px rgba(94, 0, 255, 0.15),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+  max-height: min(52vh, 480px);
+  overflow: auto;
+  animation: lagi-rise 0.35s ease-out;
+}
+
+.lagi-agents-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lagi-agents-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+.lagi-mark {
+  color: var(--lagi-primary);
+  text-shadow: 0 0 10px rgba(0, 255, 149, 0.7);
+  animation: lagi-pulse 2.4s ease-in-out infinite;
+}
+
+.lagi-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 0, 177, 0.5);
+  color: var(--lagi-secondary);
+  border-radius: 999px;
+}
+
+.lagi-agents-lead,
+.lagi-agent-desc,
+.lagi-meta {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+.lagi-meta {
+  margin: 0;
+}
+
+.lagi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.lagi-generate,
+.lagi-draft {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lagi-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lagi-primary);
+}
+
+.lagi-agents input,
+.lagi-agents textarea {
+  width: 100%;
+  background: var(--lagi-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.lagi-agents input:focus,
+.lagi-agents textarea:focus {
+  outline: none;
+  border-color: var(--lagi-primary);
+  box-shadow: 0 0 0 1px rgba(0, 255, 149, 0.35);
+}
+
+.lagi-glow {
+  box-shadow: 0 0 12px rgba(0, 255, 149, 0.35);
+}
+
+.lagi-agent-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.lagi-agent-card {
+  border-left: 3px solid var(--lagi-primary);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  border-radius: 0 8px 8px 0;
+}
+
+.lagi-agent-card.off {
+  opacity: 0.55;
+  border-left-color: var(--lagi-tertiary);
+}
+
+.lagi-agent-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.lagi-agent-name {
+  font-weight: 700;
+  color: #fff;
+}
+
+.lagi-agent-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lagi-agent-desc {
+  margin: 6px 0 0;
+}
+
+.msg.lagi-team-msg .role {
+  color: var(--lagi-primary, #00ff95);
+}
+
+.chat-multi-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+@keyframes lagi-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lagi-pulse {
+  0%,
+  100% {
+    text-shadow: 0 0 8px rgba(0, 255, 149, 0.55);
+  }
+  50% {
+    text-shadow: 0 0 16px rgba(0, 255, 149, 0.95);
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;

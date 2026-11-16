@@ -500,6 +500,20 @@
     "sampleConfigJson": "{\n  \"mcpServers\": {\n    \"time\": {\n      \"command\": \"uvx\",\n      \"args\": [\"mcp-server-time\"]\n    }\n  }\n}"
   },
   {
+    "id": "optional-multi-agent",
+    "name": "Multi-agent teaming",
+    "description": "LocalAGI-inspired cooperative roles (Planner → Implementer → Reviewer). Opt in from the Agents panel; Generate Team asks your model for a custom roster. Runs sequentially on your configured LM Studio / remote model — no cloud agent pool.",
+    "category": "ai-tools",
+    "tags": ["agents", "multi-agent", "team", "localagi"],
+    "trust": "optional",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "requiresRemote": false,
+    "homepage": "https://github.com/mudler/LocalAGI",
+    "installGuidance": "Tools catalog → keep Multi-agent teaming enabled. Open Agents on the dock, toggle Multi-agent mode, optionally Generate Team from a goal, then Send in chat. Attribution: LocalAGI (MIT) — see NOTICE."
+  },
+  {
     "id": "thirdparty-remote-models",
     "name": "Remote Cloud Models",
     "description": "Opt-in OpenAI-compatible remote endpoint (base URL + API key) via Settings. Never used as a silent fallback from local mode.",

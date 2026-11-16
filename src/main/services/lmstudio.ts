@@ -234,11 +234,15 @@ export class LmStudioService {
   }
 
   cancel(requestId: string): boolean {
-    const controller = this.abortControllers.get(requestId)
-    if (!controller) return false
-    controller.abort()
-    this.abortControllers.delete(requestId)
-    return true
+    let hit = false
+    for (const [id, controller] of this.abortControllers) {
+      if (id === requestId || id.startsWith(`${requestId}:`)) {
+        controller.abort()
+        this.abortControllers.delete(id)
+        hit = true
+      }
+    }
+    return hit
   }
 
   private headers(provider: ProviderSettings): Record<string, string> {

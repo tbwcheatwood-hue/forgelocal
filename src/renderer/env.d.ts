@@ -1,3 +1,4 @@
+import type { AgentRole } from '../shared/agents'
 import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
 import type {
   AppSettings,
@@ -37,6 +38,22 @@ export interface ForgeApi {
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
     contextFiles: Array<{ relativePath: string; path: string; content: string }>
   }) => Promise<{ content: string; proposedEdits: ProposedEdit[] }>
+  generateTeam: (payload: {
+    requestId: string
+    description: string
+  }) => Promise<{ ok: true; agents: AgentRole[] } | { ok: false; error: string }>
+  runTeam: (payload: {
+    requestId: string
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+    contextFiles: Array<{ relativePath: string; path: string; content: string }>
+  }) => Promise<{
+    content: string
+    proposedEdits: ProposedEdit[]
+    agentRun: {
+      mode: 'multi'
+      turns: Array<{ agentId: string; agentName: string; content: string; error?: string }>
+    }
+  }>
   cancelChat: (requestId: string) => Promise<boolean>
   onChatChunk: (cb: (payload: { requestId: string; chunk: StreamChunk }) => void) => () => void
   applyEdit: (edit: ProposedEdit, decision: 'accepted' | 'rejected') => Promise<ProposedEdit>

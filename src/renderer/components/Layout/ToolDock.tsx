@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
+import { enabledAgents, normalizeAgentTeam } from '@shared/agents'
 import { useAppStore } from '../../stores/appStore'
 import { buildMcpDockSnapshot } from '@shared/mcp'
 import { canUseOnlineTools, isRemoteMode } from '@shared/providerTools'
+import { AgentsPanel } from '../Agents/AgentsPanel'
 import { McpPanel } from './McpPanel'
 
 /** Bottom dock: provider / MCP / online tools / context budget. */
@@ -13,11 +15,19 @@ export function ToolDock() {
   const streaming = useAppStore((s) => s.streaming)
   const catalog = useAppStore((s) => s.catalog)
   const showMcpPanel = useAppStore((s) => s.showMcpPanel)
+  const showAgentsPanel = useAppStore((s) => s.showAgentsPanel)
   const mcpProbes = useAppStore((s) => s.mcpProbes)
   const mcpLoading = useAppStore((s) => s.mcpLoading)
   const setShow = useAppStore((s) => s.setShow)
   const refreshLm = useAppStore((s) => s.refreshLm)
   const setCatalogFilters = useAppStore((s) => s.setCatalogFilters)
+  const team = useMemo(() => normalizeAgentTeam(settings.agentTeam), [settings.agentTeam])
+  const featureAgents = settings.enabledTools['optional-multi-agent'] !== false
+  const agentMeta = team.enabled
+    ? `${enabledAgents(team).length} roles`
+    : featureAgents
+      ? 'off'
+      : 'disabled'
 
   const mcp = useMemo(
     () =>
@@ -64,13 +74,30 @@ export function ToolDock() {
 
         <button
           className={`dock-chip ${showMcpPanel ? 'active' : ''}`}
-          onClick={() => setShow('showMcpPanel', !showMcpPanel)}
+          onClick={() => {
+            setShow('showMcpPanel', !showMcpPanel)
+            if (!showMcpPanel) setShow('showAgentsPanel', false)
+          }}
           title={mcp.message}
           aria-expanded={showMcpPanel}
         >
           <span className={`status-dot ${mcpDot}`} />
           <span className="dock-label">MCP</span>
           <span className="dock-meta">{mcpLoading ? 'loading' : mcp.status}</span>
+        </button>
+
+        <button
+          className={`dock-chip ${showAgentsPanel ? 'active' : ''} ${team.enabled ? '' : 'muted'}`}
+          onClick={() => {
+            setShow('showAgentsPanel', !showAgentsPanel)
+            if (!showAgentsPanel) setShow('showMcpPanel', false)
+          }}
+          title="LocalAGI-inspired multi-agent team (explicit opt-in)"
+          aria-expanded={showAgentsPanel}
+        >
+          <span className={`status-dot ${team.enabled ? 'connected' : 'unknown'}`} />
+          <span className="dock-label">Agents</span>
+          <span className="dock-meta">{agentMeta}</span>
         </button>
 
         {onlineOk ? (
@@ -121,6 +148,7 @@ export function ToolDock() {
       </div>
 
       {showMcpPanel && <McpPanel />}
+      {showAgentsPanel && <AgentsPanel />}
     </div>
   )
 }
