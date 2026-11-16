@@ -1,0 +1,20 @@
+{
+  "provider": {
+    "baseUrl": "http://localhost:1234/v1",
+    "apiKey": "lm-studio",
+    "model": "",
+    "timeoutMs": 120000,
+    "stream": true
+  },
+  "theme": "dark",
+  "fontSize": 14,
+  "recentProjects": [],
+  "enabledTools": {
+    "builtin-file-ops": true,
+    "builtin-diff-review": true,
+    "builtin-terminal": true,
+    "builtin-search": true
+  },
+  "toolConfigs": {},
+  "allowPathsOutsideWorkspace": false
+}

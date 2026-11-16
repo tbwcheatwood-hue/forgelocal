@@ -1,0 +1,93 @@
+{
+  "name": "forgelocal",
+  "version": "0.1.0",
+  "description": "Local-first desktop IDE with LM Studio AI assistant",
+  "main": "out/main/index.js",
+  "author": "ForgeLocal",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"tests/**/*.{ts,tsx}\" \"*.{json,md,yml}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"tests/**/*.{ts,tsx}\" \"*.{json,md,yml}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "diff": "^7.0.0",
+    "electron-store": "^8.2.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xterm": "^5.3.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/diff": "^6.0.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jsdom": "^26.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.1",
+    "vitest": "^3.0.8"
+  },
+  "build": {
+    "appId": "com.forgelocal.app",
+    "productName": "ForgeLocal",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/catalog.json",
+        "to": "catalog.json"
+      },
+      {
+        "from": "config/config.example.json",
+        "to": "config.example.json"
+      }
+    ],
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Development"
+    },
+    "mac": {
+      "target": [
+        "dir"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        "dir"
+      ]
+    }
+  }
+}

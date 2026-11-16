@@ -1,0 +1,14 @@
+node_modules
+out
+release
+dist
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+coverage
+.vite
+*.local
+.idea
+.vscode
