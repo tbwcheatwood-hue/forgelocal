@@ -1,4 +1,5 @@
 import { DEFAULT_AGENT_TEAM, type AgentTeamSettings } from './agents'
+import type { ChatMessageContent } from './attachments'
 import { DEFAULT_COMPANION_BRIDGE, type CompanionBridgeSettings } from './companion'
 import type { McpServerConfig } from './mcp'
 
@@ -106,6 +107,8 @@ export interface ChatMessage {
   content: string
   createdAt: number
   contextFiles?: string[]
+  /** Non-code composer attachments (names only in history — no base64 persisted). */
+  attachmentNames?: string[]
   proposedEdits?: ProposedEdit[]
   error?: string
   /** Present when this assistant message came from a multi-agent team run. */
@@ -158,7 +161,7 @@ export interface LmConnectionResult {
 }
 
 export interface ChatCompletionRequest {
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: ChatMessageContent }>
   model: string
   stream?: boolean
   temperature?: number

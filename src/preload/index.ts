@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AgentRole } from '../shared/agents'
+import type { ComposerAttachment } from '../shared/attachments'
 import type {
   CompanionHealth,
   CompanionPairResult,
@@ -43,7 +44,10 @@ export interface ForgeApi {
   listModels: () => Promise<LmModel[]>
   chat: (payload: {
     requestId: string
-    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+    messages: Array<{
+      role: 'system' | 'user' | 'assistant'
+      content: import('../shared/attachments').ChatMessageContent
+    }>
     contextFiles: Array<{ relativePath: string; path: string; content: string }>
   }) => Promise<{ content: string; proposedEdits: ProposedEdit[] }>
   generateTeam: (payload: {
@@ -52,8 +56,12 @@ export interface ForgeApi {
   }) => Promise<{ ok: true; agents: AgentRole[] } | { ok: false; error: string }>
   runTeam: (payload: {
     requestId: string
-    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+    messages: Array<{
+      role: 'system' | 'user' | 'assistant'
+      content: import('../shared/attachments').ChatMessageContent
+    }>
     contextFiles: Array<{ relativePath: string; path: string; content: string }>
+    attachmentText?: string
   }) => Promise<{
     content: string
     proposedEdits: ProposedEdit[]
@@ -62,6 +70,15 @@ export interface ForgeApi {
       turns: Array<{ agentId: string; agentName: string; content: string; error?: string }>
     }
   }>
+  pickAttachments: () => Promise<
+    { ok: true; attachments: ComposerAttachment[] } | { ok: false; error: string }
+  >
+  ingestAttachmentPaths: (
+    paths: string[]
+  ) => Promise<{ ok: true; attachments: ComposerAttachment[] } | { ok: false; error: string }>
+  ingestAttachmentBuffers: (
+    files: Array<{ name: string; mimeType?: string; dataBase64: string }>
+  ) => Promise<{ ok: true; attachments: ComposerAttachment[] } | { ok: false; error: string }>
   cancelChat: (requestId: string) => Promise<boolean>
   onChatChunk: (cb: (payload: { requestId: string; chunk: StreamChunk }) => void) => () => void
   applyEdit: (edit: ProposedEdit, decision: 'accepted' | 'rejected') => Promise<ProposedEdit>
@@ -130,6 +147,9 @@ const api: ForgeApi = {
   chat: (payload) => ipcRenderer.invoke('lm:chat', payload),
   generateTeam: (payload) => ipcRenderer.invoke('agents:generateTeam', payload),
   runTeam: (payload) => ipcRenderer.invoke('agents:runTeam', payload),
+  pickAttachments: () => ipcRenderer.invoke('attachments:pick'),
+  ingestAttachmentPaths: (paths) => ipcRenderer.invoke('attachments:ingestPaths', paths),
+  ingestAttachmentBuffers: (files) => ipcRenderer.invoke('attachments:ingestBuffers', files),
   cancelChat: (requestId) => ipcRenderer.invoke('lm:cancel', requestId),
   onChatChunk: (cb) => {
     const listener = (

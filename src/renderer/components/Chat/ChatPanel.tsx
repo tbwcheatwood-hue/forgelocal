@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { enabledAgents, normalizeAgentTeam } from '@shared/agents'
+import { modelLikelySupportsVision } from '@shared/attachments'
 import { useAppStore } from '../../stores/appStore'
 import { DiffReview } from '../DiffReview/DiffReview'
 import { isRemoteMode } from '@shared/providerTools'
@@ -49,11 +50,19 @@ export function ChatPanel() {
   const setShow = useAppStore((s) => s.setShow)
   const activeAgentName = useAppStore((s) => s.activeAgentName)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const composerAttachments = useAppStore((s) => s.composerAttachments)
+  const pickComposerAttachments = useAppStore((s) => s.pickComposerAttachments)
+  const removeComposerAttachment = useAppStore((s) => s.removeComposerAttachment)
+  const clearComposerAttachments = useAppStore((s) => s.clearComposerAttachments)
+  const ingestDroppedFiles = useAppStore((s) => s.ingestDroppedFiles)
+  const [dragging, setDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const contextFiles = useMemo(
     () => openFiles.filter((f) => selectedContext.includes(f.path)),
     [openFiles, selectedContext]
   )
+  const visionOk = modelLikelySupportsVision(settings.provider.model)
 
   const team = useMemo(() => normalizeAgentTeam(settings.agentTeam), [settings.agentTeam])
   const featureOn = settings.enabledTools['optional-multi-agent'] !== false
@@ -163,6 +172,9 @@ export function ChatPanel() {
               {msg.agentRun?.mode === 'multi' ? ' · multi-agent' : ''}
             </div>
             <MessageBody content={msg.content} streaming={streaming && msg.role === 'assistant'} />
+            {msg.attachmentNames?.length ? (
+              <div className="composer-hint">Attached: {msg.attachmentNames.join(', ')}</div>
+            ) : null}
             {msg.error && <div className="error-state">{msg.error}</div>}
             {msg.proposedEdits?.map((edit) => (
               <DiffReview key={edit.id} edit={edit} onDecide={decideEdit} />
@@ -171,11 +183,25 @@ export function ChatPanel() {
         ))}
       </div>
 
-      <div className="chat-composer">
+      <div
+        className={`chat-composer${dragging ? ' drop-active' : ''}`}
+        onDragEnter={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          const files = Array.from(e.dataTransfer.files || [])
+          if (files.length) void ingestDroppedFiles(files)
+        }}
+      >
         <div className="context-chips" aria-label="Selected context files">
-          {contextFiles.length === 0 && (
+          {contextFiles.length === 0 && composerAttachments.length === 0 && (
             <span className="composer-hint">
-              No context selected — only your prompt will be sent.
+              No code context — use + on open files, or Attach for PDF/docx/images.
             </span>
           )}
           {contextFiles.map((f) => (
@@ -195,16 +221,62 @@ export function ChatPanel() {
               </button>
             ))}
         </div>
+        <div className="context-chips attach-chips" aria-label="Composer attachments">
+          {composerAttachments.map((a) => (
+            <span
+              className={`chip attach-chip kind-${a.kind}`}
+              key={a.id}
+              title={a.warning || a.mimeType}
+            >
+              {a.kind === 'image'
+                ? 'IMG'
+                : a.kind === 'pdf'
+                  ? 'PDF'
+                  : a.kind === 'docx'
+                    ? 'DOCX'
+                    : 'FILE'}{' '}
+              {a.name}
+              {a.warning ? ' !' : ''}
+              <button
+                aria-label={`Remove attachment ${a.name}`}
+                onClick={() => removeComposerAttachment(a.id)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {composerAttachments.length > 0 && (
+            <button className="chip" type="button" onClick={() => clearComposerAttachments()}>
+              Clear attachments
+            </button>
+          )}
+        </div>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={remote ? 'Ask your remote model…' : 'Ask your local model…'}
+          placeholder={
+            remote
+              ? 'Ask your remote model… (drop PDF/docx/images here)'
+              : 'Ask your local model… (drop PDF/docx/images here)'
+          }
           aria-label="Prompt"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
               void submit()
             }
+          }}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.docx,.txt,.md,.csv,.json,image/*,application/pdf"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || [])
+            e.target.value = ''
+            if (files.length) void ingestDroppedFiles(files)
           }}
         />
         <div
@@ -228,27 +300,52 @@ export function ChatPanel() {
             </span>
           ) : (
             <span className="composer-hint">
-              Ctrl/⌘ + Enter to send
+              Ctrl/⌘ + Enter · {visionOk ? 'vision model' : 'text/PDF/docx extract (no vision)'}
               {promptChars > 0
                 ? ` · ${promptChars.toLocaleString()} chars / ~${promptWords.toLocaleString()} words`
                 : ''}
+              {composerAttachments.length ? ` · ${composerAttachments.length} attachment(s)` : ''}
             </span>
           )}
-          {streaming ? (
-            <button className="btn danger" onClick={() => cancelPrompt()}>
-              Cancel
-            </button>
-          ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
-              className="btn primary"
-              disabled={
-                !prompt.trim() || disconnected || !settings.provider.model || overHard || streaming
-              }
-              onClick={() => void submit()}
+              className="btn ghost"
+              type="button"
+              disabled={streaming}
+              onClick={() => void pickComposerAttachments()}
+              title="Browse files to attach"
             >
-              Send
+              Attach
             </button>
-          )}
+            <button
+              className="btn ghost"
+              type="button"
+              disabled={streaming}
+              onClick={() => fileInputRef.current?.click()}
+              title="Pick files from a file input"
+            >
+              Browse
+            </button>
+            {streaming ? (
+              <button className="btn danger" onClick={() => cancelPrompt()}>
+                Cancel
+              </button>
+            ) : (
+              <button
+                className="btn primary"
+                disabled={
+                  !prompt.trim() ||
+                  disconnected ||
+                  !settings.provider.model ||
+                  overHard ||
+                  streaming
+                }
+                onClick={() => void submit()}
+              >
+                Send
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

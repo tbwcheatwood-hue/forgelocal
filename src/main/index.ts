@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'path'
 import { AgentsService } from './services/agents'
+import { AttachmentsService } from './services/attachments'
 import { CatalogService } from './services/catalog'
 import { CompanionService } from './services/companion'
 import { FilesystemService } from './services/filesystem'
@@ -28,6 +29,7 @@ const mcpService = new McpService()
 const agentsService = new AgentsService(lmService)
 const companionService = new CompanionService()
 const previewService = new PreviewService()
+const attachmentsService = new AttachmentsService()
 
 function createWindow(): void {
   const settings = settingsService.getSettings()
@@ -144,7 +146,8 @@ app.whenReady().then(() => {
     mcp: mcpService,
     agents: agentsService,
     companion: companionService,
-    preview: previewService
+    preview: previewService,
+    attachments: attachmentsService
   })
   buildMenu()
   createWindow()
