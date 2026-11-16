@@ -36,6 +36,40 @@ describe('offline tools catalog', () => {
     expect(remote?.requiresRemote).toBe(false)
   })
 
+  it('indexes official MCP sources, registries, and stdio starters', () => {
+    const expected = [
+      'mcp-ref-official-servers',
+      'mcp-ref-servers-archived',
+      'mcp-ref-voltagent-official',
+      'mcp-ref-awesome-punkpeye',
+      'mcp-ref-awesome-appcypher',
+      'mcp-ref-openhands-extensions',
+      'mcp-ref-registry-official',
+      'mcp-ref-smithery',
+      'mcp-ref-pulsemcp',
+      'mcp-ref-cline-marketplace',
+      'optional-mcp-context7-starter',
+      'optional-mcp-playwright-starter',
+      'optional-mcp-repomix-starter',
+      'optional-mcp-git-starter',
+      'optional-mcp-fetch-starter'
+    ]
+    for (const id of expected) {
+      const item = catalog.get(id)
+      expect(item, id).toBeTruthy()
+      expect(item!.tags).toContain('mcp')
+      expect(item!.requiresRemote).not.toBe(true)
+    }
+    expect(
+      catalog.search({ query: 'context7' }).some((i) => i.id === 'optional-mcp-context7-starter')
+    ).toBe(true)
+    expect(catalog.search({ query: 'smithery' }).some((i) => i.id === 'mcp-ref-smithery')).toBe(
+      true
+    )
+    expect(catalog.get('optional-mcp-filesystem-example')?.mcpSuggested?.command).toBe('npx')
+    expect(catalog.get('mcp-ref-openhands-extensions')?.sampleConfigJson).toMatch(/mcpServers/)
+  })
+
   it('reloads the offline catalog without network', () => {
     const result = catalog.refreshOffline()
     expect(result.ok).toBe(true)

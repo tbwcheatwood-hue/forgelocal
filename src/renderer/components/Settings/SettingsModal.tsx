@@ -241,8 +241,9 @@ export function SettingsModal() {
               <>
                 Remote mode uses your base URL + API key against an OpenAI-compatible{' '}
                 <code>/models</code> and <code>/chat/completions</code> API. ForgeLocal does not
-                invent credentials. Online tools/extensions unlock only after a remote model is
-                selected. Switching back to Local disables those tools automatically.
+                invent credentials. Online marketplace tools unlock only after a remote model is
+                selected. The MCP dock (local stdio) works with every model — local or remote.
+                Switching back to Local disables online marketplace tools automatically.
               </>
             ) : (
               <>

@@ -5,6 +5,14 @@ export type TrustStatus = 'built-in' | 'optional' | 'third-party'
 export type CatalogCategory =
   'editors' | 'languages' | 'ai-tools' | 'terminals' | 'vcs' | 'security' | 'productivity'
 
+/** Optional one-click stdio preset for the MCP dock (user still confirms add). */
+export interface McpSuggestedServer {
+  name: string
+  command: string
+  args: string[]
+  note?: string
+}
+
 export interface CatalogItem {
   id: string
   name: string
@@ -18,6 +26,12 @@ export interface CatalogItem {
   installGuidance: string
   /** When true, enable/use only if a remote cloud model is active. */
   requiresRemote?: boolean
+  /** Documentation / upstream URL (shown in catalog detail). */
+  homepage?: string
+  /** Suggested local stdio server the user can add from the catalog/dock. */
+  mcpSuggested?: McpSuggestedServer
+  /** Example OpenHands-style mcpServers JSON snippet (display only). */
+  sampleConfigJson?: string
   configSchema?: Record<string, unknown>
 }
 

@@ -46,7 +46,18 @@ export class CatalogService {
         return false
       }
       if (!query) return true
-      const haystack = [item.name, item.description, item.source, ...item.tags]
+      const haystack = [
+        item.name,
+        item.description,
+        item.source,
+        item.homepage ?? '',
+        item.installGuidance,
+        item.sampleConfigJson ?? '',
+        item.mcpSuggested?.name ?? '',
+        item.mcpSuggested?.command ?? '',
+        ...(item.mcpSuggested?.args ?? []),
+        ...item.tags
+      ]
         .join(' ')
         .toLowerCase()
       return haystack.includes(query)

@@ -82,8 +82,8 @@ export function ToolDock() {
             }}
             title={
               onlineEnabled
-                ? 'Online tools/extensions allowed while remote model is active'
-                : 'Remote model active — open catalog to enable online tools/extensions'
+                ? 'Online tools/extensions allowed while remote model is active (MCP is separate and always local-capable)'
+                : 'Remote model active — open catalog to enable online tools/extensions. MCP dock works in local mode too.'
             }
           >
             <span className={`status-dot ${onlineEnabled ? 'connected' : 'unknown'}`} />
@@ -93,7 +93,7 @@ export function ToolDock() {
         ) : (
           <div
             className="dock-chip static muted"
-            title="Online tools/extensions are available only when a remote cloud model is active"
+            title="Online marketplace tools need a remote cloud model. MCP stdio catalog/dock works with local LM Studio."
           >
             <span className="status-dot unknown" />
             <span className="dock-label">Online</span>

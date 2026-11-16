@@ -5,6 +5,7 @@ import {
   canUseOnlineTools,
   catalogItemRequiresRemote,
   disableRemoteOnlyTools,
+  isMcpAvailableForAllModels,
   isRemoteMode
 } from '../src/shared/providerTools'
 import type { AppSettings, CatalogItem } from '../src/shared/types'
@@ -104,6 +105,27 @@ describe('provider / online tool gating', () => {
     )
     expect(next.enabledTools['optional-online-extensions']).toBe(false)
     expect(next.enabledTools['builtin-terminal']).toBe(true)
+  })
+
+  it('keeps MCP catalog available under local LM Studio (not remote-gated)', () => {
+    expect(catalogItemRequiresRemote(mcpItem)).toBe(false)
+    expect(isMcpAvailableForAllModels(mcpItem)).toBe(true)
+    expect(() =>
+      assertOnlineToolAllowed(settingsWith({ mode: 'local', model: 'openai/gpt-oss-20b' }), mcpItem)
+    ).not.toThrow()
+    const next = disableRemoteOnlyTools(
+      settingsWith({
+        mode: 'local',
+        model: 'local-1',
+        enabledTools: {
+          'optional-online-extensions': true,
+          'thirdparty-mcp-dock': true
+        }
+      }),
+      [onlineItem, mcpItem]
+    )
+    expect(next.enabledTools['optional-online-extensions']).toBe(false)
+    expect(next.enabledTools['thirdparty-mcp-dock']).toBe(true)
   })
 })
 

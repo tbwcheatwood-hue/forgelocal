@@ -1,6 +1,10 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
-import { canUseOnlineTools, catalogItemRequiresRemote } from '@shared/providerTools'
+import {
+  canUseOnlineTools,
+  catalogItemRequiresRemote,
+  isMcpAvailableForAllModels
+} from '@shared/providerTools'
 
 const CATEGORIES = [
   'all',
@@ -24,6 +28,7 @@ export function CatalogModal() {
   const selectCatalog = useAppStore((s) => s.selectCatalog)
   const settings = useAppStore((s) => s.settings)
   const setToolEnabled = useAppStore((s) => s.setToolEnabled)
+  const upsertMcpServer = useAppStore((s) => s.upsertMcpServer)
   const setError = useAppStore((s) => s.setError)
   const onlineOk = canUseOnlineTools(settings)
 
@@ -63,8 +68,9 @@ export function CatalogModal() {
           <div>
             <strong>Tools & Extensions</strong>
             <div style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 4 }}>
-              Offline catalog · enable only what this build implements
-              {!onlineOk && ' · online/cloud tools hidden until a remote model is active'}
+              Offline catalog · enable only what this build implements · MCP works with local or
+              remote models
+              {!onlineOk && ' · online/cloud (non-MCP) tools hidden until a remote model is active'}
             </div>
           </div>
           <button className="btn ghost" onClick={() => setShow('showCatalog', false)}>
@@ -135,6 +141,42 @@ export function CatalogModal() {
                   <p>
                     <strong>Install / config:</strong> {selected.installGuidance}
                   </p>
+                  {selected.homepage && (
+                    <p style={{ marginTop: 8 }}>
+                      <strong>Homepage:</strong>{' '}
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => void window.forge.openExternal(selected.homepage!)}
+                      >
+                        {selected.homepage}
+                      </button>
+                    </p>
+                  )}
+                  {isMcpAvailableForAllModels(selected) && (
+                    <p style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 12 }}>
+                      MCP entry — available with local LM Studio and remote models (stdio stays
+                      local).
+                    </p>
+                  )}
+                  {selected.sampleConfigJson && (
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Sample mcpServers JSON</strong>
+                      <pre
+                        style={{
+                          marginTop: 6,
+                          padding: 10,
+                          overflow: 'auto',
+                          maxHeight: 180,
+                          fontSize: 11,
+                          background: 'var(--bg-elevated, #12100e)',
+                          borderRadius: 8
+                        }}
+                      >
+                        {selected.sampleConfigJson}
+                      </pre>
+                    </div>
+                  )}
                   {selectedNeedsRemote && !onlineOk && (
                     <div className="error-state" style={{ marginTop: 10 }}>
                       Requires an active remote cloud model. Switch Provider mode to Remote and
@@ -156,6 +198,40 @@ export function CatalogModal() {
                     <button className="btn" onClick={() => setToolEnabled(selected.id, false)}>
                       Disable
                     </button>
+                    {selected.mcpSuggested && (
+                      <button
+                        className="btn"
+                        type="button"
+                        title={selected.mcpSuggested.note ?? 'Add suggested stdio server'}
+                        onClick={() => {
+                          const suggested = selected.mcpSuggested!
+                          void (async () => {
+                            const ok = await window.forge.confirm(
+                              `Add MCP server “${suggested.name}”?`,
+                              [
+                                `command: ${suggested.command}`,
+                                `args: ${suggested.args.join(' ')}`,
+                                suggested.note ??
+                                  'First-time npx/uvx may download packages. ForgeLocal will not invent API keys.'
+                              ].join('\n')
+                            )
+                            if (!ok) return
+                            await upsertMcpServer({
+                              name: suggested.name,
+                              command: suggested.command,
+                              args: suggested.args,
+                              enabled: true
+                            })
+                            setShow('showCatalog', false)
+                            setShow('showMcpPanel', true)
+                          })().catch((err: unknown) => {
+                            setError(err instanceof Error ? err.message : String(err))
+                          })
+                        }}
+                      >
+                        Add suggested MCP server
+                      </button>
+                    )}
                   </div>
                   <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 12 }}>
                     Current:{' '}

@@ -214,23 +214,49 @@ If a server _does_ return metadata (`max_model_len`, `context_length`, …), val
 
 ## MCP dock
 
-The tool dock’s **MCP** chip opens a panel for:
+The tool dock’s **MCP** chip works with **every model** — local LM Studio and remote OpenAI-compatible alike. Online marketplace tools are still gated to remote mode; MCP stdio is not.
 
-- Browsing MCP-related catalog entries
-- Adding **local stdio** servers (`command` + `args`)
-- Probing `initialize` + `tools/list`
+The panel supports:
 
-Tool **invocation** from chat is not auto-run — the dock is for discovery and honest status.
+- Browsing the offline MCP catalog (official servers index, awesome-lists, registries, starters)
+- **Suggested stdio starters** (Filesystem, Git, Fetch, Context7, Playwright, Repomix, Memory, Sequential Thinking, Time) with confirm-before-add
+- OpenHands-style `mcpServers` JSON samples in catalog detail
+- Adding **local stdio** servers (`command` + `args`) and probing `initialize` + `tools/list`
+
+Tool **invocation** from chat is not auto-run — the dock is for discovery, presets, and honest status. ForgeLocal never invents remote MCP credentials or auto-spawns untrusted `npx` without confirmation.
+
+Reference indexes included in `resources/catalog.json` (browse-only unless you add a command yourself):
+
+- [modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) (+ [servers-archived](https://github.com/modelcontextprotocol/servers-archived))
+- [VoltAgent/official-mcp-servers](https://github.com/VoltAgent/official-mcp-servers)
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers), [appcypher/awesome-mcp-servers](https://github.com/appcypher/awesome-mcp-servers)
+- [OpenHands/extensions](https://github.com/OpenHands/extensions)
+- [MCP Registry](https://registry.modelcontextprotocol.io), [Smithery](https://smithery.ai), [PulseMCP](https://pulsemcp.com), [Cline MCP Marketplace](https://docs.cline.bot/mcp/mcp-marketplace)
 
 ### Add a local MCP server
 
 1. Open a project → click **MCP** in the dock.
-2. **Add server**, for example:
+2. Use **Add suggested config** on a starter, or **Add server** manually, for example:
    - Fixture: `command=node`, `args=tests/fixtures/fake-mcp-server.mjs` (from the repo root)
-   - Filesystem example: `command=npx`, `args=-y @modelcontextprotocol/server-filesystem /abs/path`
+   - Filesystem: `npx -y @modelcontextprotocol/server-filesystem /abs/path`
+   - Context7: `npx -y @upstash/context7-mcp`
+   - Playwright: `npx -y @playwright/mcp`
+   - Repomix: `repomix --mcp`
+   - Fetch: `uvx mcp-server-fetch`
 3. **Refresh tools** / **Probe** to list tools over stdio.
 
-ForgeLocal does not invent remote MCP credentials.
+Sample OpenHands-compatible shape (also shown in catalog detail):
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/ABS/WORKSPACE"]
+    }
+  }
+}
+```
 
 ---
 

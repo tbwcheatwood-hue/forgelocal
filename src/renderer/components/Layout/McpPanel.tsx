@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { buildMcpDockSnapshot, parseMcpArgsInput } from '@shared/mcp'
+import type { CatalogItem } from '@shared/types'
+import { isRemoteMode } from '@shared/providerTools'
 
 export function McpPanel() {
   const catalog = useAppStore((s) => s.catalog)
@@ -15,6 +17,8 @@ export function McpPanel() {
   const removeMcpServer = useAppStore((s) => s.removeMcpServer)
   const refreshMcpTools = useAppStore((s) => s.refreshMcpTools)
   const setCatalogFilters = useAppStore((s) => s.setCatalogFilters)
+  const setError = useAppStore((s) => s.setError)
+  const selectCatalog = useAppStore((s) => s.selectCatalog)
 
   const [name, setName] = useState('Local MCP')
   const [command, setCommand] = useState('node')
@@ -32,7 +36,41 @@ export function McpPanel() {
     [catalog, settings.enabledTools, settings.mcpServers, mcpProbes, mcpQuery]
   )
 
+  const presets = useMemo(
+    () =>
+      catalog.filter(
+        (item): item is CatalogItem & { mcpSuggested: NonNullable<CatalogItem['mcpSuggested']> } =>
+          Boolean(item.mcpSuggested)
+      ),
+    [catalog]
+  )
+
   const featureOn = settings.enabledTools['thirdparty-mcp-dock'] !== false
+  const remote = isRemoteMode(settings.provider)
+
+  const applySuggested = async (item: CatalogItem) => {
+    const suggested = item.mcpSuggested
+    if (!suggested) return
+    const ok = await window.forge.confirm(
+      `Add MCP server “${suggested.name}”?`,
+      [
+        `command: ${suggested.command}`,
+        `args: ${suggested.args.join(' ')}`,
+        suggested.note ??
+          'First-time npx/uvx may download packages. Edit absolute paths before probing.'
+      ].join('\n')
+    )
+    if (!ok) return
+    setName(suggested.name)
+    setCommand(suggested.command)
+    setArgsText(suggested.args.join(' '))
+    await upsertMcpServer({
+      name: suggested.name,
+      command: suggested.command,
+      args: suggested.args,
+      enabled: true
+    })
+  }
 
   return (
     <div className="mcp-panel" role="region" aria-label="MCP tools catalog">
@@ -52,6 +90,10 @@ export function McpPanel() {
       </div>
 
       <p className="mcp-panel-msg">{snap.message}</p>
+      <p className="mcp-tool-reason">
+        MCP works with {remote ? 'your remote model' : 'local LM Studio'} — stdio servers stay on
+        this machine. Online marketplace sync is optional and separate.
+      </p>
 
       {!featureOn && (
         <div className="error-state" style={{ marginBottom: 10 }}>
@@ -112,6 +154,16 @@ export function McpPanel() {
                       <button className="btn" onClick={() => void setToolEnabled(row.id, false)}>
                         Disable
                       </button>
+                      <button
+                        className="btn ghost"
+                        onClick={() => {
+                          selectCatalog(row.id)
+                          setCatalogFilters(row.name, 'ai-tools')
+                          setShow('showCatalog', true)
+                        }}
+                      >
+                        Details
+                      </button>
                     </div>
                   )}
                 </li>
@@ -121,6 +173,50 @@ export function McpPanel() {
         </section>
 
         <section>
+          <h4 className="mcp-section-title">Suggested stdio starters</h4>
+          {presets.length === 0 ? (
+            <div className="empty-state">No presets in the offline catalog.</div>
+          ) : (
+            <ul className="mcp-tool-list">
+              {presets.map((item) => (
+                <li key={item.id} className="available">
+                  <div className="mcp-tool-name">{item.mcpSuggested.name}</div>
+                  <div className="mcp-tool-reason">
+                    <code>
+                      {item.mcpSuggested.command} {item.mcpSuggested.args.join(' ')}
+                    </code>
+                  </div>
+                  {item.mcpSuggested.note && (
+                    <div className="mcp-tool-reason">{item.mcpSuggested.note}</div>
+                  )}
+                  <div className="diff-actions" style={{ marginTop: 8 }}>
+                    <button
+                      className="btn primary"
+                      onClick={() =>
+                        void applySuggested(item).catch((err: unknown) =>
+                          setError(err instanceof Error ? err.message : String(err))
+                        )
+                      }
+                    >
+                      Add suggested config
+                    </button>
+                    <button
+                      className="btn ghost"
+                      onClick={() => {
+                        const s = item.mcpSuggested!
+                        setName(s.name)
+                        setCommand(s.command)
+                        setArgsText(s.args.join(' '))
+                      }}
+                    >
+                      Fill form
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <h4 className="mcp-section-title">Local stdio servers</h4>
           {snap.servers.length === 0 ? (
             <div className="empty-state">

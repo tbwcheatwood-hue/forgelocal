@@ -13,9 +13,19 @@ export function canUseOnlineTools(settings: AppSettings): boolean {
 }
 
 export function catalogItemRequiresRemote(item: CatalogItem): boolean {
+  // MCP catalog / local stdio tooling is available for every provider mode.
+  if (item.tags.includes('mcp') || item.id.includes('mcp')) {
+    if (item.requiresRemote === true) return true
+    return false
+  }
   if (item.requiresRemote === true) return true
   if (item.requiresRemote === false) return false
   return item.tags.some((t) => t === 'online' || t === 'cloud' || t === 'remote-online')
+}
+
+/** MCP dock + MCP catalog entries work with local LM Studio and remote models alike. */
+export function isMcpAvailableForAllModels(item: CatalogItem): boolean {
+  return (item.tags.includes('mcp') || item.id.includes('mcp')) && !catalogItemRequiresRemote(item)
 }
 
 /** Disable any enabled tools that require remote when switching back to local. */
