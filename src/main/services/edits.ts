@@ -1,9 +1,106 @@
 import { createHash, randomUUID } from 'crypto'
+import path from 'path'
 import type { ProposedEdit } from '../../shared/types'
+import { isPathInsideWorkspace } from './security'
 
 const FENCE_RE = /```(?:[\w.+-]+)?\s*\n(?:\/\/\s*)?(?:file|path):\s*(.+?)\n([\s\S]*?)```/gi
 
 const ALT_FENCE_RE = /```(?:[\w.+-]+)?\s*\n([\s\S]*?)```/g
+
+/** True absolute paths (home, tmp, Windows drive) — not repo-root style `/app/...`. */
+export function looksLikeFilesystemAbsolute(p: string): boolean {
+  const s = p.trim()
+  if (/^[a-zA-Z]:[\\/]/.test(s)) return true
+  if (!s.startsWith('/')) return false
+  return (
+    s.startsWith('/home/') ||
+    s.startsWith('/Users/') ||
+    s.startsWith('/tmp/') ||
+    s.startsWith('/var/') ||
+    s.startsWith('/private/') ||
+    s.startsWith('/opt/') ||
+    s.startsWith('/usr/') ||
+    s.startsWith('/etc/') ||
+    s.startsWith('/mnt/') ||
+    s.startsWith('/Volumes/')
+  )
+}
+
+/**
+ * Normalize model-provided edit paths.
+ * Models often emit `/app/src/...` (Android) — treat as workspace-relative, not FS root.
+ */
+export function normalizeEditRelativePath(raw: string): string | null {
+  let s = (raw ?? '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\\/g, '/')
+  if (!s) return null
+  s = s.replace(/^file:\/\//i, '')
+  // Drop drive letters for relative normalization
+  s = s.replace(/^[a-zA-Z]:\//, '')
+  // Strip leading ./ and lone leading slashes for repo-relative paths
+  s = s.replace(/^\.\//, '')
+  if (s.startsWith('/') && !looksLikeFilesystemAbsolute(s)) {
+    s = s.replace(/^\/+/, '')
+  }
+  if (!s || s.includes('..')) return null
+  if (looksLikeFilesystemAbsolute(s)) return null
+  return s.slice(0, 512)
+}
+
+/**
+ * Resolve where Accept should write, always under the open workspace root.
+ */
+export function resolveEditTargetPath(
+  workspaceRoot: string | null,
+  edit: Pick<ProposedEdit, 'path' | 'relativePath'>
+): { ok: true; path: string; relativePath: string } | { ok: false; error: string } {
+  if (!workspaceRoot) {
+    return { ok: false, error: 'No workspace open — open the project before accepting edits.' }
+  }
+  const root = path.resolve(workspaceRoot)
+  const candidates: string[] = []
+
+  const rel =
+    normalizeEditRelativePath(edit.relativePath) || normalizeEditRelativePath(edit.path) || null
+  if (rel) candidates.push(path.join(root, rel))
+
+  const rawPath = (edit.path ?? '').trim()
+  if (rawPath && looksLikeFilesystemAbsolute(rawPath)) {
+    const abs = path.resolve(rawPath)
+    if (isPathInsideWorkspace(abs, root)) candidates.unshift(abs)
+    else {
+      // Absolute path outside root: if it contains the workspace as a prefix
+      // segment mismatch (symlink/casing), still try relative fallback only.
+      const stripped = normalizeEditRelativePath(rawPath)
+      if (stripped) candidates.push(path.join(root, stripped))
+      // Also try path relative to root when abs starts with root after normalize
+      const under = abs.startsWith(root + path.sep) ? abs : null
+      if (under) candidates.unshift(under)
+    }
+  } else if (rawPath && !rel) {
+    const fromPath = normalizeEditRelativePath(rawPath)
+    if (fromPath) candidates.push(path.join(root, fromPath))
+  }
+
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate)
+    if (isPathInsideWorkspace(resolved, root)) {
+      return {
+        ok: true,
+        path: resolved,
+        relativePath: path.relative(root, resolved).split(path.sep).join('/')
+      }
+    }
+  }
+
+  const hint = edit.relativePath || edit.path || '(empty)'
+  return {
+    ok: false,
+    error: `Path is outside the workspace: ${hint}. Open the correct project root, or use a path under it.`
+  }
+}
 
 export function parseProposedEdits(
   assistantText: string,
@@ -13,10 +110,15 @@ export function parseProposedEdits(
   const seen = new Set<string>()
 
   for (const match of assistantText.matchAll(FENCE_RE)) {
-    const relativePath = match[1].trim().replace(/^["']|["']$/g, '')
+    const rawPath = match[1].trim().replace(/^["']|["']$/g, '')
+    const relativePath = normalizeEditRelativePath(rawPath) || rawPath.replace(/^\/+/, '')
     const proposedContent = match[2].replace(/\n$/, '')
     const ctx = contextFiles.find(
-      (f) => f.relativePath === relativePath || f.path.endsWith(relativePath)
+      (f) =>
+        f.relativePath === relativePath ||
+        f.relativePath === rawPath ||
+        f.path.endsWith(relativePath) ||
+        f.path.endsWith(rawPath.replace(/^\/+/, ''))
     )
     const key = relativePath
     if (seen.has(key)) continue
@@ -24,7 +126,7 @@ export function parseProposedEdits(
     edits.push({
       id: randomUUID(),
       path: ctx?.path ?? relativePath,
-      relativePath,
+      relativePath: ctx?.relativePath ?? relativePath,
       originalContent: ctx?.content ?? '',
       proposedContent,
       summary: summarizeDiff(ctx?.content ?? '', proposedContent),

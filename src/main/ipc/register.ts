@@ -21,7 +21,7 @@ import { AgentsService } from '../services/agents'
 import { AttachmentsService } from '../services/attachments'
 import { CatalogService } from '../services/catalog'
 import { CompanionService } from '../services/companion'
-import { parseProposedEdits } from '../services/edits'
+import { parseProposedEdits, resolveEditTargetPath } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
 import { collectGitSnapshot } from '../services/git'
 import { collectLocalHardware } from '../services/hardware'
@@ -343,13 +343,17 @@ export function registerIpc(services: Services): void {
       if (decision !== 'accepted') {
         throw new Error('Invalid decision')
       }
-      const root = fileService.workspaceRoot
-      const targetPath =
-        root && edit.path && !edit.path.startsWith('/') && !/^[a-zA-Z]:[\\/]/.test(edit.path)
-          ? join(root, edit.relativePath || edit.path)
-          : edit.path
-      await fileService.writeFile(targetPath, edit.proposedContent)
-      return { ...edit, path: targetPath, status: 'accepted' as const }
+      const resolved = resolveEditTargetPath(fileService.workspaceRoot, edit)
+      if (!resolved.ok) {
+        throw new Error(resolved.error)
+      }
+      await fileService.writeFile(resolved.path, edit.proposedContent)
+      return {
+        ...edit,
+        path: resolved.path,
+        relativePath: resolved.relativePath,
+        status: 'accepted' as const
+      }
     }
   )
 
