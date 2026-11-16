@@ -2,6 +2,7 @@ import { DEFAULT_AGENT_TEAM, type AgentTeamSettings } from './agents'
 import type { ChatMessageContent } from './attachments'
 import { DEFAULT_COMPANION_BRIDGE, type CompanionBridgeSettings } from './companion'
 import type { McpServerConfig } from './mcp'
+import type { ProjectRecord } from './projectGen'
 
 export type TrustStatus = 'built-in' | 'optional' | 'third-party'
 
@@ -71,6 +72,8 @@ export interface AppSettings {
   theme: 'dark' | 'light'
   fontSize: number
   recentProjects: string[]
+  /** AI-generated projects remembered for the welcome/recent strip (paths + meta). */
+  rememberedProjects: ProjectRecord[]
   enabledTools: Record<string, boolean>
   toolConfigs: Record<string, Record<string, unknown>>
   allowPathsOutsideWorkspace: boolean
@@ -226,6 +229,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   fontSize: 14,
   recentProjects: [],
+  rememberedProjects: [],
   enabledTools: {},
   toolConfigs: {},
   allowPathsOutsideWorkspace: false,

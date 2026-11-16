@@ -9,6 +9,7 @@ import type {
   HardwareInventory
 } from '../shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
+import type { CheckpointMeta, ProjectPlan, ProjectRecord, ProjectStack } from '../shared/projectGen'
 import type {
   AppSettings,
   CatalogFilter,
@@ -128,6 +129,39 @@ export interface ForgeApi {
   removeMcpServer: (id: string) => Promise<AppSettings>
   probeMcpServer: (id: string) => Promise<McpServerProbeResult>
   probeAllMcpServers: () => Promise<Record<string, McpServerProbeResult>>
+  planProject: (payload: {
+    requestId: string
+    description: string
+    answers?: Record<string, string>
+    stackHint?: ProjectStack
+    preferTemplate?: boolean
+  }) => Promise<{ ok: true; plan: ProjectPlan } | { ok: false; error: string; plan?: ProjectPlan }>
+  pickProjectParent: () => Promise<string | null>
+  materializeProject: (
+    parentDir: string,
+    plan: ProjectPlan
+  ) => Promise<
+    | {
+        ok: true
+        root: string
+        record: ProjectRecord
+        filesWritten: number
+        tree: FileNode
+        hasGit: boolean
+      }
+    | { ok: false; error: string }
+  >
+  createCheckpoint: (
+    label?: string
+  ) => Promise<{ ok: true; meta: CheckpointMeta } | { ok: false; error: string }>
+  listCheckpoints: () => Promise<CheckpointMeta[]>
+  restoreCheckpoint: (
+    id: string
+  ) => Promise<{ ok: true; restored: number; tree?: FileNode } | { ok: false; error: string }>
+  exportProjectZip: () => Promise<
+    { ok: true; path: string; bytes: number } | { ok: false; error: string }
+  >
+  rememberedProjects: () => Promise<ProjectRecord[]>
   onMenu: (channel: string, cb: () => void) => () => void
 }
 
@@ -195,9 +229,19 @@ const api: ForgeApi = {
   removeMcpServer: (id) => ipcRenderer.invoke('mcp:removeServer', id),
   probeMcpServer: (id) => ipcRenderer.invoke('mcp:probeServer', id),
   probeAllMcpServers: () => ipcRenderer.invoke('mcp:probeAll'),
+  planProject: (payload) => ipcRenderer.invoke('project:plan', payload),
+  pickProjectParent: () => ipcRenderer.invoke('project:pickParent'),
+  materializeProject: (parentDir, plan) =>
+    ipcRenderer.invoke('project:materialize', parentDir, plan),
+  createCheckpoint: (label) => ipcRenderer.invoke('project:checkpointCreate', label),
+  listCheckpoints: () => ipcRenderer.invoke('project:checkpointList'),
+  restoreCheckpoint: (id) => ipcRenderer.invoke('project:checkpointRestore', id),
+  exportProjectZip: () => ipcRenderer.invoke('project:exportZip'),
+  rememberedProjects: () => ipcRenderer.invoke('project:remembered'),
   onMenu: (channel, cb) => {
     const map: Record<string, string> = {
       'open-project': 'menu:open-project',
+      'new-ai-project': 'menu:new-ai-project',
       save: 'menu:save',
       'toggle-ai': 'menu:toggle-ai',
       'toggle-terminal': 'menu:toggle-terminal',

@@ -2,7 +2,9 @@ import { useAppStore } from '../../stores/appStore'
 
 export function Welcome() {
   const openProject = useAppStore((s) => s.openProject)
+  const openProjectWizard = useAppStore((s) => s.openProjectWizard)
   const recent = useAppStore((s) => s.settings.recentProjects)
+  const remembered = useAppStore((s) => s.rememberedProjects)
   const refreshLm = useAppStore((s) => s.refreshLm)
   const lmStatus = useAppStore((s) => s.lmStatus)
   const setShow = useAppStore((s) => s.setShow)
@@ -17,11 +19,14 @@ export function Welcome() {
         </div>
         <p className="welcome-headline">Local models. Your files. Your approval.</p>
         <p className="welcome-support">
-          A calm desktop forge for coding with LM Studio — offline by default, with every AI edit
-          held for review before it lands.
+          A calm desktop forge for coding with LM Studio — describe a project, generate a starter,
+          then iterate with reviewable AI edits.
         </p>
         <div className="welcome-cta">
-          <button className="btn primary" onClick={() => openProject()}>
+          <button className="btn primary" onClick={() => openProjectWizard()}>
+            New AI project
+          </button>
+          <button className="btn" onClick={() => openProject()}>
             Open project
           </button>
           <button className="btn" onClick={() => refreshLm()}>
@@ -38,6 +43,16 @@ export function Welcome() {
             <span>{lmStatus?.message ?? 'LM Studio not tested yet'}</span>
           </div>
         </div>
+        {remembered.length > 0 && (
+          <div className="recent-list" aria-label="Generated projects">
+            <div className="label">Generated</div>
+            {remembered.slice(0, 5).map((p) => (
+              <button key={p.id} onClick={() => openProject(p.path)} title={p.summary}>
+                {p.name} — {p.path}
+              </button>
+            ))}
+          </div>
+        )}
         {recent.length > 0 && (
           <div className="recent-list" aria-label="Recent projects">
             <div className="label">Recent</div>

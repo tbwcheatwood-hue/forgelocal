@@ -18,6 +18,8 @@ export function ToolDock() {
   const showMcpPanel = useAppStore((s) => s.showMcpPanel)
   const showAgentsPanel = useAppStore((s) => s.showAgentsPanel)
   const showCompanionPanel = useAppStore((s) => s.showCompanionPanel)
+  const showProjectPanel = useAppStore((s) => s.showProjectPanel)
+  const checkpoints = useAppStore((s) => s.checkpoints)
   const companionHealth = useAppStore((s) => s.companionHealth)
   const gitSnapshot = useAppStore((s) => s.gitSnapshot)
   const mcpProbes = useAppStore((s) => s.mcpProbes)
@@ -137,6 +139,18 @@ export function ToolDock() {
           <span className={`status-dot ${companionDot}`} />
           <span className="dock-label">Companion</span>
           <span className="dock-meta">{companionMeta}</span>
+        </button>
+
+        <button
+          className={`dock-chip ${showProjectPanel ? 'active' : ''}`}
+          onClick={() => setShow('showProjectPanel', !showProjectPanel)}
+          title="Checkpoints, export zip, new AI project"
+          aria-expanded={showProjectPanel}
+        >
+          <span className="dock-label">Project</span>
+          <span className="dock-meta">
+            {checkpoints.length ? `${checkpoints.length} ckpt` : 'export'}
+          </span>
         </button>
 
         <button

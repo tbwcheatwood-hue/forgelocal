@@ -25,8 +25,10 @@ import { collectLocalHardware } from '../services/hardware'
 import { LmStudioService } from '../services/lmstudio'
 import { McpService } from '../services/mcp'
 import { PreviewService } from '../services/preview'
+import { ProjectGenService } from '../services/projectGen'
 import { SettingsService } from '../services/settings'
 import { screenCommand } from '../services/security'
+import type { ProjectPlan, ProjectStack } from '../../shared/projectGen'
 
 export interface Services {
   fs: FilesystemService
@@ -38,6 +40,7 @@ export interface Services {
   companion: CompanionService
   preview: PreviewService
   attachments: AttachmentsService
+  projectGen: ProjectGenService
 }
 
 function applySettingsSideEffects(
@@ -63,7 +66,8 @@ export function registerIpc(services: Services): void {
     agents,
     companion,
     preview,
-    attachments
+    attachments,
+    projectGen
   } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
@@ -541,4 +545,88 @@ export function registerIpc(services: Services): void {
   })
 
   ipcMain.handle('util:id', () => randomUUID())
+
+  ipcMain.handle(
+    'project:plan',
+    async (
+      event,
+      payload: {
+        requestId: string
+        description: string
+        answers?: Record<string, string>
+        stackHint?: ProjectStack
+        preferTemplate?: boolean
+      }
+    ) => {
+      return projectGen.planProject({
+        ...payload,
+        onChunk: (chunk) => {
+          event.sender.send('lm:chunk', { requestId: payload.requestId, chunk })
+        }
+      })
+    }
+  )
+
+  ipcMain.handle('project:pickParent', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose folder for the new project'
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('project:materialize', async (_e, parentDir: string, plan: ProjectPlan) => {
+    const result = await projectGen.materialize(parentDir, plan)
+    if (!result.ok) return result
+    const root = await fileService.openWorkspace(result.root)
+    settings.addRecentProject(root)
+    return {
+      ...result,
+      tree: await fileService.readTree(),
+      hasGit: await fileService.hasGit()
+    }
+  })
+
+  ipcMain.handle('project:checkpointCreate', async (_e, label?: string) =>
+    projectGen.createCheckpoint(label)
+  )
+  ipcMain.handle('project:checkpointList', async () => projectGen.listCheckpoints())
+  ipcMain.handle('project:checkpointRestore', async (_e, id: string) => {
+    const ok = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Cancel', 'Restore'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'Restore this checkpoint?',
+      detail: 'Files from the checkpoint will overwrite matching paths in the open project.'
+    })
+    if (ok.response !== 1) return { ok: false as const, error: 'Cancelled' }
+    const result = await projectGen.restoreCheckpoint(id)
+    if (result.ok && fileService.workspaceRoot) {
+      return { ...result, tree: await fileService.readTree() }
+    }
+    return result
+  })
+
+  ipcMain.handle('project:exportZip', async () => {
+    if (!fileService.workspaceRoot) {
+      return { ok: false as const, error: 'Open a project before exporting.' }
+    }
+    const base = pathBasename(fileService.workspaceRoot)
+    const result = await dialog.showSaveDialog({
+      title: 'Export project zip',
+      defaultPath: `${base || 'project'}.zip`,
+      filters: [{ name: 'Zip archive', extensions: ['zip'] }]
+    })
+    if (result.canceled || !result.filePath) return { ok: false as const, error: 'Cancelled' }
+    return projectGen.exportZip(result.filePath)
+  })
+
+  ipcMain.handle('project:remembered', () => projectGen.listRememberedProjects())
+}
+
+function pathBasename(p: string): string {
+  const parts = p.replace(/\\/g, '/').split('/')
+  return parts[parts.length - 1] || 'project'
 }

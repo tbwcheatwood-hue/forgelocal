@@ -74,7 +74,10 @@ export class SettingsService {
       previewDir:
         typeof settings.previewDir === 'string' && settings.previewDir.trim()
           ? settings.previewDir.trim().slice(0, 260)
-          : DEFAULT_SETTINGS.previewDir
+          : DEFAULT_SETTINGS.previewDir,
+      rememberedProjects: Array.isArray(settings.rememberedProjects)
+        ? settings.rememberedProjects.slice(0, 24)
+        : []
     }
   }
 
@@ -104,7 +107,11 @@ export class SettingsService {
           ? String(partial.previewDir || '.')
               .trim()
               .slice(0, 260) || '.'
-          : current.previewDir
+          : current.previewDir,
+      rememberedProjects:
+        partial.rememberedProjects !== undefined
+          ? partial.rememberedProjects.slice(0, 24)
+          : current.rememberedProjects
     }
     this.store.set('settings', next)
     return next
