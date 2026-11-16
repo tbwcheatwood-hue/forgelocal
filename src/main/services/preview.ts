@@ -2,6 +2,7 @@ import http from 'http'
 import fs from 'fs/promises'
 import path from 'path'
 import { randomBytes } from 'crypto'
+import { PREVIEW_CSP } from '../../shared/networkAccess'
 import { isPathInsideWorkspace } from './security'
 
 const MIME: Record<string, string> = {
@@ -35,7 +36,9 @@ interface Session {
 
 /**
  * Loopback-only static preview inspired by LocalForge Companion preview.js.
- * Serves authorized workspace files; no LAN bind.
+ * Serves authorized workspace files on 127.0.0.1 only (no LAN bind).
+ * Response CSP is open so generated apps can fetch APIs / CDN / websockets;
+ * path jail + token URL remain the isolation boundary.
  */
 export class PreviewService {
   private session: Session | null = null
@@ -149,10 +152,15 @@ async function serveStatic(
   }
   const data = await fs.readFile(filePath)
   const ext = path.extname(filePath).toLowerCase()
-  res.writeHead(200, {
+  const headers: Record<string, string> = {
     'Content-Type': MIME[ext] || 'application/octet-stream',
-    'Cache-Control': 'no-store',
-    'X-Frame-Options': 'SAMEORIGIN'
-  })
+    'Cache-Control': 'no-store'
+  }
+  // HTML gets a network-open CSP + frame-ancestors so the IDE iframe can embed
+  // the app and the app can fetch APIs / CDN / websockets.
+  if (ext === '.html' || ext === '.htm') {
+    headers['Content-Security-Policy'] = PREVIEW_CSP
+  }
+  res.writeHead(200, headers)
   res.end(data)
 }

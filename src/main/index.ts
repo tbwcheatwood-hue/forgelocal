@@ -7,6 +7,7 @@ import { CompanionService } from './services/companion'
 import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
 import { McpService } from './services/mcp'
+import { configureSessionNetworkAccess } from './services/networkAccess'
 import { PreviewService } from './services/preview'
 import { ProjectGenService } from './services/projectGen'
 import { SettingsService } from './services/settings'
@@ -51,16 +52,26 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      // Preload needs limited Node; sandbox stays off. Renderer still has no Node.
+      sandbox: false,
+      // Keep Chromium web security; network is opened via CSP + session permissions.
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   })
+
+  // Allow media/clipboard/fullscreen for IDE + preview; deny exotic device APIs.
+  configureSessionNetworkAccess(mainWindow.webContents.session)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    // External https/http links open in the OS browser — not a new Electron window.
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      void shell.openExternal(url)
+    }
     return { action: 'deny' }
   })
 
@@ -145,6 +156,7 @@ function buildMenu(): void {
 }
 
 app.whenReady().then(() => {
+  configureSessionNetworkAccess()
   registerIpc({
     fs: fileService,
     settings: settingsService,
