@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ForgeLocal
+GenericName=IDE
+Comment=Local-first desktop IDE with LM Studio AI assistant
+Exec=ENV_FORGELOCAL_ROOT/scripts/forgelocal-dev.sh
+Icon=ENV_FORGELOCAL_ROOT/resources/icons/icon.png
+Path=ENV_FORGELOCAL_ROOT
+Terminal=false
+Categories=Development;IDE;
+Keywords=forge;ide;lmstudio;code;editor;
+StartupNotify=true
+StartupWMClass=forgelocal

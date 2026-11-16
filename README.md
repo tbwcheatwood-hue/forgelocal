@@ -29,6 +29,29 @@ Runtime settings are stored locally via `electron-store` (not committed). The ex
 npm run dev
 ```
 
+Or via the wrapper used by the Linux desktop shortcut:
+
+```bash
+./scripts/forgelocal-dev.sh
+```
+
+### App icon
+
+ForgeLocal ships a forge-ember hammer-and-anvil mark:
+
+- Source: `resources/icons/icon.svg`
+- Window / packaging: `resources/icons/icon.png`, `build/icon.png`, `build/icons/*`, `build/icon.ico`
+
+### Linux desktop shortcut
+
+```bash
+./scripts/install-desktop-shortcut.sh --desktop
+```
+
+This writes `~/.local/share/applications/forgelocal.desktop`, installs hicolor icons, and optionally `~/Desktop/ForgeLocal.desktop` (GNOME “trusted” metadata when `gio` is available).
+
+If the icon does not refresh immediately: log out/in, or restart the session on Wayland. On X11 GNOME you can try `Alt+F2` then `r`.
+
 On Linux, `npm run dev` sets `ELECTRON_DISABLE_SANDBOX=1` so Electron can start without a root-owned SUID `chrome-sandbox`. That is the supported local-dev path (no sudo required).
 
 If you prefer the real Chromium sandbox instead:

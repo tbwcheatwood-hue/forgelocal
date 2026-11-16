@@ -54,8 +54,10 @@
   "build": {
     "appId": "com.forgelocal.app",
     "productName": "ForgeLocal",
+    "icon": "build/icon.png",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "out/**/*",
@@ -70,24 +72,37 @@
       {
         "from": "config/config.example.json",
         "to": "config.example.json"
+      },
+      {
+        "from": "resources/icons/icon.png",
+        "to": "icons/icon.png"
       }
     ],
     "linux": {
       "target": [
         "dir"
       ],
-      "category": "Development"
+      "category": "Development",
+      "icon": "build/icons",
+      "desktop": {
+        "Name": "ForgeLocal",
+        "Comment": "Local-first desktop IDE with LM Studio",
+        "Categories": "Development;IDE;",
+        "StartupWMClass": "forgelocal"
+      }
     },
     "mac": {
       "target": [
         "dir"
       ],
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png"
     },
     "win": {
       "target": [
         "dir"
-      ]
+      ],
+      "icon": "build/icon.ico"
     }
   }
 }

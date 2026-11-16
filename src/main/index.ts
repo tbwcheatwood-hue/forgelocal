@@ -4,6 +4,7 @@ import { CatalogService } from './services/catalog'
 import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
 import { SettingsService } from './services/settings'
+import { resolveAppIcon } from './iconPath'
 import { registerIpc } from './ipc/register'
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
@@ -20,6 +21,7 @@ function createWindow(): void {
   const settings = settingsService.getSettings()
   fileService.setAllowOutside(settings.allowPathsOutsideWorkspace)
 
+  const icon = resolveAppIcon()
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -28,6 +30,7 @@ function createWindow(): void {
     show: false,
     title: 'ForgeLocal',
     backgroundColor: '#0f1419',
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

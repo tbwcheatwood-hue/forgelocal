@@ -20,6 +20,7 @@ import { FilesystemService } from '../services/filesystem'
 import { LmStudioService } from '../services/lmstudio'
 import { SettingsService } from '../services/settings'
 import { validateCommandSafety } from '../services/security'
+import { resolveAppIcon } from '../iconPath'
 
 export interface Services {
   fs: FilesystemService
@@ -45,6 +46,7 @@ function applySettingsSideEffects(
 }
 
 function createPopoutBrowserWindow(): BrowserWindow {
+  const icon = resolveAppIcon()
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -53,6 +55,7 @@ function createPopoutBrowserWindow(): BrowserWindow {
     show: false,
     title: 'ForgeLocal IDE',
     backgroundColor: '#0f1419',
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
