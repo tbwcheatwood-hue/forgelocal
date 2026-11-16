@@ -48,7 +48,11 @@ interface AppState {
   selectedCatalogId: string | null
   error: string | null
   radialOpen: boolean
+  radialPos: { x: number; y: number } | null
+  selectionText: string
   syntaxDimming: boolean
+  ghostIndex: number
+  canvasFocusPath: string | null
 
   bootstrap: () => Promise<void>
   openProject: (path?: string) => Promise<void>
@@ -62,7 +66,12 @@ interface AppState {
   selectModel: (model: string) => Promise<void>
   sendPrompt: (prompt: string) => Promise<void>
   cancelPrompt: () => Promise<void>
-  decideEdit: (edit: ProposedEdit, decision: 'accepted' | 'rejected') => Promise<void>
+  decideEdit: (
+    edit: ProposedEdit,
+    decision: 'accepted' | 'rejected',
+    opts?: { skipConfirm?: boolean }
+  ) => Promise<void>
+  runIntent: (intent: 'extract' | 'optimize' | 'tests' | 'explain') => Promise<void>
   loadCatalog: () => Promise<void>
   setToolEnabled: (id: string, enabled: boolean) => Promise<void>
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>
@@ -77,7 +86,10 @@ interface AppState {
   setCatalogFilters: (query: string, category: string) => void
   selectCatalog: (id: string | null) => void
   setError: (error: string | null) => void
-  setRadialOpen: (open: boolean) => void
+  setRadialOpen: (open: boolean, pos?: { x: number; y: number } | null) => void
+  setSelectionText: (text: string) => void
+  setGhostIndex: (index: number) => void
+  setCanvasFocusPath: (path: string | null) => void
 }
 
 function emptySession(workspacePath?: string): ChatSession {
@@ -120,19 +132,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedCatalogId: null,
   error: null,
   radialOpen: false,
+  radialPos: null,
+  selectionText: '',
   syntaxDimming: false,
+  ghostIndex: 0,
+  canvasFocusPath: null,
 
   bootstrap: async () => {
-    const settings = await window.forge.getSettings()
+    let settings = await window.forge.getSettings()
     const catalog = await window.forge.listCatalog()
-    const syntaxDimming = Boolean(settings.enabledTools['optional-syntax-dimming'])
-    const showCanvas = Boolean(settings.enabledTools['optional-canvas'])
+    // Gift defaults: enable stretch polish tools unless the user already chose otherwise
+    const stretchPatch: Record<string, boolean> = {}
+    for (const id of [
+      'optional-ambient-radial',
+      'optional-syntax-dimming',
+      'optional-canvas'
+    ] as const) {
+      if (settings.enabledTools[id] === undefined) stretchPatch[id] = true
+    }
+    if (Object.keys(stretchPatch).length) {
+      settings = await window.forge.updateSettings({
+        enabledTools: { ...settings.enabledTools, ...stretchPatch }
+      })
+    }
     set({
       settings,
       catalog,
       session: emptySession(),
-      syntaxDimming,
-      showCanvas
+      syntaxDimming: settings.enabledTools['optional-syntax-dimming'] !== false,
+      showCanvas: Boolean(settings.enabledTools['optional-canvas'])
     })
     await get().refreshLm()
   },
@@ -344,7 +372,13 @@ export const useAppStore = create<AppState>((set, get) => ({
             : m
         )
       }
-      set({ session: finalSession, streaming: false, requestId: null })
+      set({
+        session: finalSession,
+        streaming: false,
+        requestId: null,
+        ghostIndex: 0,
+        showAi: true
+      })
       await window.forge.saveChatSession(finalSession)
 
       const cmdMatch = result.content.match(/```(?:bash|sh|shell)\n([\s\S]*?)```/i)
@@ -376,8 +410,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ streaming: false, requestId: null })
   },
 
-  decideEdit: async (edit, decision) => {
-    if (decision === 'accepted') {
+  decideEdit: async (edit, decision, opts) => {
+    if (decision === 'accepted' && !opts?.skipConfirm) {
       const ok = await window.forge.confirm(
         'Apply AI edit?',
         `This will overwrite:\n${edit.relativePath}\n\n${edit.summary}`
@@ -394,7 +428,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         proposedEdits: m.proposedEdits?.map((e) => (e.id === edit.id ? updated : e))
       }))
     }
-    set({ session: next })
+    set({ session: next, ghostIndex: 0 })
     if (decision === 'accepted') {
       const open = get().openFiles.find((f) => f.path === edit.path)
       if (open) {
@@ -410,11 +444,57 @@ export const useAppStore = create<AppState>((set, get) => ({
               : f
           )
         })
+      } else if (edit.path) {
+        try {
+          await get().openFile(edit.path)
+          set({
+            openFiles: get().openFiles.map((f) =>
+              f.path === edit.path
+                ? {
+                    ...f,
+                    content: edit.proposedContent,
+                    originalContent: edit.proposedContent,
+                    dirty: false
+                  }
+                : f
+            )
+          })
+        } catch {
+          // file may be new relative path only
+        }
       }
       const tree = await window.forge.getTree()
       if (tree) set({ tree })
     }
     await window.forge.saveChatSession(next)
+  },
+
+  runIntent: async (intent) => {
+    const selection = get().selectionText.trim()
+    const active = get().openFiles.find((f) => f.path === get().activePath)
+    if (active && !get().selectedContext.includes(active.path)) {
+      get().toggleContext(active.path)
+    }
+    const snippet = selection
+      ? `\n\nSelected snippet:\n\`\`\`\n${selection.slice(0, 4000)}\n\`\`\``
+      : ''
+    const prompts: Record<typeof intent, string> = {
+      extract:
+        'Extract a clean reusable function/module from the attached context (and snippet if any). Propose the edit as a reviewable file diff.' +
+        snippet,
+      optimize:
+        'Optimize the attached context for clarity and performance without changing behavior. Propose a reviewable diff.' +
+        snippet,
+      tests:
+        'Propose focused unit tests for the attached context / selection as a new or updated test file diff.' +
+        snippet,
+      explain:
+        'Explain the attached context / selection briefly: purpose, key flows, and pitfalls.' +
+        snippet
+    }
+    get().setShow('showAi', true)
+    get().setRadialOpen(false)
+    await get().sendPrompt(prompts[intent])
   },
 
   loadCatalog: async () => {
@@ -483,5 +563,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCatalogFilters: (query, category) => set({ catalogQuery: query, catalogCategory: category }),
   selectCatalog: (id) => set({ selectedCatalogId: id }),
   setError: (error) => set({ error }),
-  setRadialOpen: (open) => set({ radialOpen: open })
+  setRadialOpen: (open, pos = null) => set({ radialOpen: open, radialPos: open ? pos : null }),
+  setSelectionText: (text) => set({ selectionText: text }),
+  setGhostIndex: (index) => set({ ghostIndex: index }),
+  setCanvasFocusPath: (path) => set({ canvasFocusPath: path })
 }))

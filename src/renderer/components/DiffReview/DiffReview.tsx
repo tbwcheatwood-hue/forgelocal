@@ -18,7 +18,11 @@ export function DiffReview({
   onDecide
 }: {
   edit: ProposedEdit
-  onDecide: (edit: ProposedEdit, decision: 'accepted' | 'rejected') => void
+  onDecide: (
+    edit: ProposedEdit,
+    decision: 'accepted' | 'rejected',
+    opts?: { skipConfirm?: boolean }
+  ) => void | Promise<void>
 }) {
   const preview = createDiffPreview(edit.originalContent, edit.proposedContent)
 

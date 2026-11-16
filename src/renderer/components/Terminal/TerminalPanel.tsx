@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { ToolDock } from '../Layout/ToolDock'
 
 export function TerminalPanel() {
   const showTerminal = useAppStore((s) => s.showTerminal)
@@ -18,46 +19,70 @@ export function TerminalPanel() {
     })
   }, [])
 
-  if (!showTerminal) return null
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!pendingCommand) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'TEXTAREA' || (tag === 'INPUT' && (e.target as HTMLInputElement).value)) return
+      if (e.key === 'Enter' && e.metaKey) {
+        e.preventDefault()
+        void approveCommand()
+      } else if (e.key === 'Escape' && !(e.target as HTMLElement)?.closest?.('.ghost-layer')) {
+        // Ghost layer owns Esc when present; still allow reject here if focus is terminal
+        if ((e.target as HTMLElement)?.closest?.('.terminal-panel')) {
+          e.preventDefault()
+          rejectCommand()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pendingCommand, approveCommand, rejectCommand])
+
+  if (!showTerminal) {
+    return <ToolDock />
+  }
 
   return (
-    <div className="terminal-panel" role="region" aria-label="Terminal">
-      <div className="terminal-toolbar">
-        <strong>Terminal</strong>
-        <input
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-          placeholder="Command card — Enter to stage for approval"
-          aria-label="Manual command"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && manual.trim()) {
-              proposeCommand(manual.trim(), 'Manual command card')
-              setManual('')
-            }
-          }}
-        />
-      </div>
-      {pendingCommand && (
-        <div className="command-card">
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-            Approval required · {pendingCommand.reason}
-          </div>
-          <pre style={{ margin: 0, fontFamily: 'var(--font-code)', fontSize: 12 }}>
-            {pendingCommand.command}
-          </pre>
-          <div className="diff-actions">
-            <button className="btn primary" onClick={() => approveCommand()}>
-              Approve & Run
-            </button>
-            <button className="btn" onClick={() => rejectCommand()}>
-              Reject
-            </button>
-          </div>
+    <div className="terminal-stack">
+      <div className="terminal-panel" role="region" aria-label="Terminal">
+        <div className="terminal-toolbar">
+          <strong>Command Cards</strong>
+          <input
+            value={manual}
+            onChange={(e) => setManual(e.target.value)}
+            placeholder="Stage a command for approval — Enter"
+            aria-label="Manual command"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && manual.trim()) {
+                proposeCommand(manual.trim(), 'Manual command card')
+                setManual('')
+              }
+            }}
+          />
         </div>
-      )}
-      <div className="terminal-output">
-        {terminalLog || 'Ready. AI commands appear as glass command cards and need your approval.'}
+        {pendingCommand && (
+          <div className="command-card glass">
+            <div className="command-card-head">
+              <span>Approval required</span>
+              <span className="composer-hint">{pendingCommand.reason}</span>
+            </div>
+            <pre>{pendingCommand.command}</pre>
+            <div className="diff-actions">
+              <button className="btn primary" onClick={() => void approveCommand()}>
+                Approve & Run
+              </button>
+              <button className="btn" onClick={() => rejectCommand()}>
+                Reject
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="terminal-output">
+          {terminalLog || 'Ready. AI shell suggestions appear as glass command cards.'}
+        </div>
       </div>
+      <ToolDock />
     </div>
   )
 }

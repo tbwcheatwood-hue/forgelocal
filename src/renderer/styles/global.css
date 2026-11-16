@@ -1036,19 +1036,54 @@ select:focus-visible,
   animation: rise 0.22s var(--ease-out);
 }
 
+.center-column.canvas-mode {
+  background: #0a0908;
+}
+
 .canvas-view {
   position: relative;
   height: 100%;
   overflow: hidden;
   background:
-    radial-gradient(circle at 18% 22%, rgba(224, 160, 106, 0.1), transparent 32%),
-    radial-gradient(circle at 78% 64%, rgba(127, 175, 163, 0.08), transparent 30%), #0a0908;
+    radial-gradient(circle at 18% 22%, rgba(224, 160, 106, 0.12), transparent 34%),
+    radial-gradient(circle at 78% 64%, rgba(127, 175, 163, 0.1), transparent 32%),
+    linear-gradient(180deg, #12100e, #0a0908);
+}
+
+.canvas-toolbar {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.canvas-meta {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-family: var(--font-code);
+  margin-right: auto;
 }
 
 .canvas-surface {
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
+  cursor: grab;
+}
+
+.cluster-label {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  pointer-events: none;
 }
 
 .sat-card {
@@ -1059,43 +1094,362 @@ select:focus-visible,
   border: 1px solid var(--border);
   background: rgba(26, 23, 20, 0.9);
   cursor: pointer;
+  text-align: left;
   transition:
-    transform 0.2s var(--ease-out),
-    border-color 0.2s ease;
+    transform 0.22s var(--ease-out),
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.sat-card.living {
+  animation: floaty 5s ease-in-out infinite;
+}
+
+.sat-card.living:nth-child(3n) {
+  animation-delay: 0.4s;
+}
+.sat-card.living:nth-child(4n) {
+  animation-delay: 0.9s;
+}
+
+.sat-card.glass {
+  position: relative;
+  width: 100%;
+  left: auto;
+  top: auto;
+  background: linear-gradient(145deg, rgba(36, 32, 28, 0.72), rgba(18, 16, 14, 0.55));
+  backdrop-filter: blur(12px);
+  margin-bottom: 8px;
 }
 
 .sat-card:hover,
 .sat-card.focused {
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-2px) scale(1.03);
   border-color: rgba(224, 160, 106, 0.55);
+  background: rgba(36, 28, 22, 0.95);
+}
+
+.sat-card.in-context {
+  box-shadow: inset 2px 0 0 var(--ai);
 }
 
 .sat-card .name {
   font-family: var(--font-code);
   font-size: 12px;
+  color: var(--text);
+}
+
+.sat-ext {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.sat-path {
+  color: var(--text-faint);
+  font-size: 10px;
+  margin-top: 4px;
+  font-family: var(--font-code);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-lens {
+  position: absolute;
+  z-index: 6;
+  left: 4%;
+  right: 4%;
+  top: 56px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(224, 160, 106, 0.35);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(24, 20, 16, 0.94), rgba(10, 9, 8, 0.92));
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+  animation: rise 0.28s var(--ease-out);
+  overflow: hidden;
+}
+
+.focus-lens-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.focus-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.focus-sub {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.focus-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focus-lens-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 200px;
+}
+
+.focus-editor {
+  min-height: 0;
+  border-right: 1px solid var(--border-soft);
+}
+
+.satellite-rail {
+  padding: 12px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.rail-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 10px;
 }
 
 .radial-menu {
-  position: absolute;
-  z-index: 40;
+  position: fixed;
+  z-index: 60;
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: rgba(18, 16, 14, 0.94);
+  border: 1px solid rgba(224, 160, 106, 0.35);
+  background: radial-gradient(
+    circle at 40% 35%,
+    rgba(224, 160, 106, 0.16),
+    rgba(18, 16, 14, 0.94) 55%
+  );
   box-shadow: var(--shadow);
   display: grid;
   place-items: center;
   animation: rise 0.18s var(--ease-out);
+  backdrop-filter: blur(10px);
 }
 
-.radial-menu button {
+.radial-core {
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.radial-spoke {
   position: absolute;
   border: 1px solid var(--border);
-  background: var(--bg-3);
+  background: rgba(36, 32, 28, 0.95);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 11px;
+  font-weight: 600;
+}
+
+.radial-spoke:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Ghost-layer temporal diff */
+.editor-host.has-ghost {
+  display: grid;
+  grid-template-rows: 1fr minmax(220px, 42%);
+}
+
+.ghost-layer {
+  position: relative;
+  border-top: 1px solid rgba(127, 175, 163, 0.35);
+  background: linear-gradient(180deg, rgba(127, 175, 163, 0.08), rgba(196, 125, 69, 0.05));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: rise 0.28s var(--ease-out);
+}
+
+.ghost-tint {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(127, 175, 163, 0.05),
+    transparent 40%,
+    rgba(224, 160, 106, 0.06)
+  );
+}
+
+.ghost-toolbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ghost-path {
+  margin-left: 8px;
+  font-family: var(--font-code);
+  color: var(--ai);
+  font-size: 12px;
+}
+
+.ghost-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.ghost-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ghost-scrubber {
+  display: flex;
+  gap: 6px;
+  margin-right: 6px;
+}
+
+.scrub-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  padding: 0;
+}
+
+.scrub-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ghost-diff {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+}
+
+.forge-dim-line {
+  opacity: 0.28;
+  filter: grayscale(0.35);
+  transition: opacity 0.25s var(--ease-out);
+}
+
+.forge-focus-line {
+  background: rgba(224, 160, 106, 0.06);
+}
+
+.terminal-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.command-card.glass,
+.command-card {
+  margin: 10px 12px 0;
+  border: 1px solid rgba(224, 160, 106, 0.35);
+  background: linear-gradient(
+    135deg,
+    rgba(224, 160, 106, 0.12),
+    rgba(26, 23, 20, 0.55) 55%,
+    rgba(127, 175, 163, 0.08)
+  );
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  padding: 12px;
+  animation: rise 0.25s var(--ease-out);
+}
+
+.command-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.command-card pre {
+  margin: 0;
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.tool-dock {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(10, 9, 8, 0.88);
+  overflow-x: auto;
+}
+
+.dock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: rgba(26, 23, 20, 0.75);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dock-chip.static {
+  cursor: default;
+}
+
+.dock-chip.muted {
+  opacity: 0.85;
+}
+
+.dock-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.dock-meta {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 @keyframes rise {
@@ -1124,6 +1478,16 @@ select:focus-visible,
   }
   to {
     transform: rotate(-6deg) translate(-12px, 10px);
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
   }
 }
 

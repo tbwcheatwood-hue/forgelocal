@@ -31,9 +31,50 @@ export default function App() {
     const bridge = window as unknown as {
       __forgeOpenProject?: (path?: string) => Promise<void>
       __forgeOpenFile?: (path: string) => Promise<void>
+      __forgeShowCanvas?: (show: boolean) => void
+      __forgeInjectGhost?: () => void
     }
     bridge.__forgeOpenProject = (path?: string) => useAppStore.getState().openProject(path)
     bridge.__forgeOpenFile = (path: string) => useAppStore.getState().openFile(path)
+    bridge.__forgeShowCanvas = (show: boolean) => useAppStore.getState().setShow('showCanvas', show)
+    bridge.__forgeInjectGhost = () => {
+      const state = useAppStore.getState()
+      const active = state.openFiles.find((f) => f.path === state.activePath)
+      if (!active || !state.session) return
+      const edit = {
+        id: crypto.randomUUID(),
+        path: active.path,
+        relativePath: active.relativePath,
+        originalContent: active.content,
+        proposedContent:
+          active.content +
+          (active.content.endsWith('\n') ? '' : '\n') +
+          '// forge: ghost-layer preview checkpoint\n',
+        summary: 'Demo ghost proposal (+1 line)',
+        status: 'pending' as const
+      }
+      const messages = [...state.session.messages]
+      if (!messages.length) {
+        messages.push({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Ghost-layer proposal ready for review.',
+          createdAt: Date.now(),
+          proposedEdits: [edit]
+        })
+      } else {
+        const last = messages[messages.length - 1]
+        messages[messages.length - 1] = {
+          ...last,
+          proposedEdits: [...(last.proposedEdits ?? []), edit]
+        }
+      }
+      useAppStore.setState({
+        session: { ...state.session, messages, updatedAt: Date.now() },
+        ghostIndex: 0,
+        showCanvas: false
+      })
+    }
   }, [])
 
   useEffect(() => {
@@ -65,7 +106,10 @@ export default function App() {
               <FileTree />
             </div>
           </aside>
-          <section className="center-column" aria-label="Editor">
+          <section
+            className={`center-column ${showCanvas ? 'canvas-mode' : ''}`}
+            aria-label="Editor"
+          >
             {showCanvas ? <CanvasView /> : <EditorPane />}
             <TerminalPanel />
           </section>

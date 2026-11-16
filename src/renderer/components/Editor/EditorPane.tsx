@@ -1,9 +1,11 @@
-import Editor, { loader, type BeforeMount } from '@monaco-editor/react'
+import { useEffect, useRef } from 'react'
+import Editor, { loader, type BeforeMount, type OnMount } from '@monaco-editor/react'
+import type { editor as MonacoEditor } from 'monaco-editor'
 import * as monacoEditor from 'monaco-editor'
 import { useAppStore } from '../../stores/appStore'
 import { RadialMenu } from '../Canvas/RadialMenu'
+import { GhostLayer } from '../DiffReview/GhostLayer'
 
-// Bundle Monaco locally — never fetch the CDN (required for offline Electron).
 loader.config({ monaco: monacoEditor })
 
 const beforeMount: BeforeMount = (monaco) => {
@@ -31,7 +33,11 @@ const beforeMount: BeforeMount = (monaco) => {
       'editorWidget.background': '#12100e',
       'editorWidget.border': '#3a332c',
       'input.background': '#0a0908',
-      focusBorder: '#e0a06a'
+      focusBorder: '#e0a06a',
+      'diffEditor.insertedTextBackground': '#7fafa333',
+      'diffEditor.removedTextBackground': '#c47d4533',
+      'diffEditor.insertedLineBackground': '#7fafa31a',
+      'diffEditor.removedLineBackground': '#c47d451a'
     }
   })
 }
@@ -45,9 +51,70 @@ export function EditorPane() {
   const syntaxDimming = useAppStore((s) => s.syntaxDimming)
   const showCanvas = useAppStore((s) => s.showCanvas)
   const setRadialOpen = useAppStore((s) => s.setRadialOpen)
+  const setSelectionText = useAppStore((s) => s.setSelectionText)
   const fontSize = useAppStore((s) => s.settings.fontSize)
+  const session = useAppStore((s) => s.session)
+
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
+  const decoRef = useRef<string[]>([])
+  const holdTimer = useRef<number | null>(null)
 
   const active = openFiles.find((f) => f.path === activePath)
+  const hasPendingGhost = Boolean(
+    session?.messages.some((m) => m.proposedEdits?.some((e) => e.status === 'pending'))
+  )
+
+  const applyDimming = (ed: MonacoEditor.IStandaloneCodeEditor) => {
+    const model = ed.getModel()
+    if (!model) return
+    if (!syntaxDimming) {
+      decoRef.current = ed.deltaDecorations(decoRef.current, [])
+      return
+    }
+    const sel = ed.getSelection()
+    if (!sel || sel.isEmpty()) {
+      decoRef.current = ed.deltaDecorations(decoRef.current, [])
+      return
+    }
+    const start = Math.min(sel.startLineNumber, sel.endLineNumber)
+    const end = Math.max(sel.startLineNumber, sel.endLineNumber)
+    const lineCount = model.getLineCount()
+    const ranges: MonacoEditor.IModelDeltaDecoration[] = []
+    if (start > 1) {
+      ranges.push({
+        range: new monacoEditor.Range(1, 1, start - 1, 1),
+        options: { isWholeLine: true, className: 'forge-dim-line' }
+      })
+    }
+    if (end < lineCount) {
+      ranges.push({
+        range: new monacoEditor.Range(end + 1, 1, lineCount, model.getLineMaxColumn(lineCount)),
+        options: { isWholeLine: true, className: 'forge-dim-line' }
+      })
+    }
+    ranges.push({
+      range: new monacoEditor.Range(start, 1, end, model.getLineMaxColumn(end)),
+      options: { isWholeLine: true, className: 'forge-focus-line' }
+    })
+    decoRef.current = ed.deltaDecorations(decoRef.current, ranges)
+  }
+
+  const onMount: OnMount = (ed) => {
+    editorRef.current = ed
+    ed.onDidChangeCursorSelection(() => {
+      const model = ed.getModel()
+      const sel = ed.getSelection()
+      if (model && sel) {
+        setSelectionText(model.getValueInRange(sel))
+      }
+      applyDimming(ed)
+    })
+  }
+
+  useEffect(() => {
+    if (editorRef.current) applyDimming(editorRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syntaxDimming, activePath])
 
   if (showCanvas) {
     return null
@@ -59,7 +126,7 @@ export function EditorPane() {
         <div className="editor-empty-inner">
           <h2>Open a file</h2>
           <p>
-            Choose something from the tree, or mark files as AI context when you are ready to ask.
+            Choose something from the tree, mark context for the assistant, or open the canvas map.
           </p>
         </div>
       </div>
@@ -95,11 +162,33 @@ export function EditorPane() {
         ))}
       </div>
       <div
-        className={`editor-host ${syntaxDimming ? 'syntax-dim' : ''}`}
+        className={`editor-host ${syntaxDimming ? 'syntax-dim' : ''} ${hasPendingGhost ? 'has-ghost' : ''}`}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setRadialOpen(true, { x: e.clientX - 90, y: e.clientY - 90 })
+        }}
+        onMouseDown={() => {
+          if (holdTimer.current) window.clearTimeout(holdTimer.current)
+          holdTimer.current = window.setTimeout(() => {
+            const ed = editorRef.current
+            if (!ed) return
+            const dom = ed.getDomNode()?.getBoundingClientRect()
+            setRadialOpen(true, {
+              x: (dom?.left ?? 120) + 80,
+              y: (dom?.top ?? 120) + 80
+            })
+          }, 450)
+        }}
+        onMouseUp={() => {
+          if (holdTimer.current) window.clearTimeout(holdTimer.current)
+        }}
+        onMouseLeave={() => {
+          if (holdTimer.current) window.clearTimeout(holdTimer.current)
+        }}
         onKeyDown={(e) => {
           if (e.ctrlKey && e.shiftKey && e.code === 'Space') {
             e.preventDefault()
-            setRadialOpen(true)
+            setRadialOpen(true, { x: 120, y: 160 })
           }
         }}
       >
@@ -110,6 +199,7 @@ export function EditorPane() {
           language={active.language}
           value={active.content}
           beforeMount={beforeMount}
+          onMount={onMount}
           onChange={(value) => updateFileContent(active.path, value ?? '')}
           options={{
             fontSize,
@@ -125,6 +215,7 @@ export function EditorPane() {
             smoothScrolling: true
           }}
         />
+        {hasPendingGhost && <GhostLayer />}
         <RadialMenu />
       </div>
     </div>
