@@ -95,8 +95,10 @@ select:focus-visible,
 
 .app-shell {
   display: grid;
-  grid-template-rows: 48px 1fr 26px;
+  grid-template-rows: 48px minmax(0, 1fr) 26px;
   height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .titlebar {
@@ -150,6 +152,10 @@ select:focus-visible,
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-x: auto;
+  max-width: min(58vw, 720px);
 }
 
 .titlebar-actions .btn {
@@ -260,26 +266,36 @@ select:focus-visible,
 
 .main-grid {
   display: grid;
-  grid-template-columns: 248px 1fr 340px;
+  grid-template-columns: minmax(160px, 248px) minmax(0, 1fr) minmax(280px, 360px);
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .main-grid.no-ai {
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: minmax(160px, 248px) minmax(0, 1fr);
 }
 
 .panel {
   min-height: 0;
+  min-width: 0;
+  max-height: 100%;
   border-right: 1px solid var(--border-soft);
   background: rgba(18, 16, 14, 0.78);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .panel.ai-panel {
   border-right: none;
   border-left: 1px solid var(--border-soft);
   background: rgba(14, 13, 12, 0.82);
+  /* Keep assistant column fully interactive inside the viewport */
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -293,6 +309,8 @@ select:focus-visible,
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-faint);
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .panel-body {
@@ -303,8 +321,11 @@ select:focus-visible,
 
 .center-column {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+  min-width: 0;
+  max-height: 100%;
+  overflow: hidden;
   background: rgba(8, 7, 6, 0.45);
 }
 
@@ -417,10 +438,11 @@ select:focus-visible,
 /* ——— Chat ——— */
 
 .chat-toolbar {
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-soft);
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .chat-toolbar label {
@@ -525,11 +547,16 @@ select:focus-visible,
 
 .chat-composer {
   border-top: 1px solid var(--border-soft);
-  padding: 12px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   background: rgba(10, 9, 8, 0.7);
+  flex-shrink: 0;
+  /* If chips + textarea grow, scroll the composer — never push Send off-screen */
+  max-height: min(46vh, 420px);
+  overflow-x: hidden;
+  overflow-y: auto;
   transition:
     box-shadow 0.15s ease,
     border-color 0.15s ease;
@@ -542,7 +569,8 @@ select:focus-visible,
 
 .chat-composer textarea {
   width: 100%;
-  min-height: 78px;
+  min-height: 64px;
+  max-height: 140px;
   resize: vertical;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -550,6 +578,26 @@ select:focus-visible,
   padding: 11px 12px;
   line-height: 1.45;
   transition: border-color 0.15s ease;
+}
+
+.composer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: rgba(10, 9, 8, 0.92);
+  padding-top: 4px;
+}
+
+.composer-actions-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .chat-composer textarea:focus {
@@ -1006,9 +1054,10 @@ select:focus-visible,
 
 .project-panel {
   position: fixed;
+  /* Sit over the center/editor, not the assistant column — Send must stay clickable */
   top: 52px;
-  right: 16px;
-  width: min(380px, calc(100vw - 32px));
+  right: max(16px, calc(min(360px, 32vw) + 24px));
+  width: min(360px, calc(100vw - min(360px, 32vw) - 48px));
   max-height: calc(100vh - 96px);
   overflow: auto;
   z-index: 40;
@@ -1017,6 +1066,7 @@ select:focus-visible,
   border-radius: var(--radius);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   animation: rise 0.25s var(--ease-out);
+  pointer-events: auto;
 }
 
 .project-panel-header {
@@ -1706,6 +1756,9 @@ select:focus-visible,
 .tool-dock-wrap {
   border-top: 1px solid var(--border-soft);
   background: rgba(10, 9, 8, 0.88);
+  flex-shrink: 0;
+  max-height: min(58vh, 560px);
+  overflow: auto;
 }
 
 .tool-dock {
@@ -2331,7 +2384,7 @@ select:focus-visible,
 
 @media (max-width: 1100px) {
   .main-grid {
-    grid-template-columns: 200px 1fr 300px;
+    grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(260px, 300px);
   }
   .catalog-grid {
     grid-template-columns: 1fr;
@@ -2339,12 +2392,29 @@ select:focus-visible,
   .workspace-path {
     max-width: 18vw;
   }
+  .project-panel {
+    right: max(12px, calc(min(300px, 34vw) + 20px));
+    width: min(320px, calc(100vw - min(300px, 34vw) - 40px));
+  }
 }
 
 @media (max-width: 860px) {
   .main-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 160px 1fr auto;
+    /* Constrain stacked AI row so composer/Send stay inside the viewport */
+    grid-template-rows: minmax(120px, 22%) minmax(0, 1fr) minmax(220px, 38%);
+  }
+  .main-grid > .panel.ai-panel {
+    border-left: none;
+    border-top: 1px solid var(--border-soft);
+  }
+  .chat-composer {
+    max-height: min(40vh, 280px);
+  }
+  .project-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
   .titlebar-actions .btn:nth-child(n + 5) {
     display: none;
