@@ -25,6 +25,7 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 - [Remote OpenAI-compatible models](#remote-openai-compatible-models)
 - [AI context window](#ai-context-window)
 - [MCP dock](#mcp-dock)
+- [Multi-agent teaming](#multi-agent-teaming)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Token & chat payload parameters](#token--chat-payload-parameters)
 - [Offline behavior](#offline-behavior)
@@ -47,6 +48,7 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 | **Diffs**     | Proposed edits appear as Accept / Reject reviews (ghost layer + assistant cards)              |
 | **Canvas**    | Optional infinite map of the workspace with a focus lens                                      |
 | **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                |
+| **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model) |
 | **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry |
 
 The IDE stays in the **main window** (there is no pop-out IDE).
@@ -260,12 +262,29 @@ Sample OpenHands-compatible shape (also shown in catalog detail):
 
 ---
 
+## Multi-agent teaming
+
+ForgeLocal can run a small cooperative team on **your** configured model (LM Studio or remote). Patterns are inspired by [LocalAGI](https://github.com/mudler/LocalAGI) (MIT) — generate roles from one goal, then hand off sequentially — implemented independently for Electron (see `NOTICE`).
+
+Defaults stay single-assistant:
+
+1. Keep **Multi-agent teaming** enabled in the Tools catalog (`optional-multi-agent`).
+2. Open **Agents** from the dock or the Assistant header.
+3. Toggle **Multi-agent on**, or check **Multi-agent** in the chat toolbar.
+4. Optionally **Generate Team** from a goal (model returns JSON roles), or edit Planner / Implementer / Reviewer manually.
+5. **Send** as usual — agents run in order; cancel aborts the whole run; a failed step soft-continues when possible.
+6. Proposed `// file:` edits still go through Accept / Reject.
+
+Multi mode never replaces the app shell, never invents a cloud agent pool, and never writes files without review.
+
+---
+
 ## End-to-end workflow
 
 1. **Open a project** (Welcome → Open project, or File → Open Project).
 2. Connect LM Studio and pick a model.
 3. Open files; mark context with `+` in the file tree (nothing else is sent).
-4. Prompt in the Assistant panel (`Ctrl/⌘ + Enter`).
+4. Prompt in the Assistant panel (`Ctrl/⌘ + Enter`). Optional: enable **Multi-agent** for a sequential team run.
 5. Review proposed diffs → **Accept** (writes after confirm) or **Reject**.
 6. AI shell suggestions appear as **Command Cards** and need explicit approval before running.
 
@@ -275,6 +294,7 @@ Optional polish (catalog tools, enabled by default for a gift experience):
 - **Ghost layer** — holographic diff under the active file
 - **Intent radial** — right-click / hold / Ctrl+Shift+Space → Extract · Optimize · Tests · Explain
 - **Syntax dimming** — dims lines outside the current selection when enabled
+- **Multi-agent** — LocalAGI-inspired team (explicit opt-in in Agents)
 
 ---
 
@@ -368,15 +388,16 @@ npm run package
 ## Project layout
 
 ```
-src/main/          Electron main: FS, LM Studio, catalog, MCP, IPC, security
+src/main/          Electron main: FS, LM Studio, agents, catalog, MCP, IPC, security
 src/preload/       contextBridge API
-src/renderer/      React UI (IDE, chat, diffs, catalog, canvas)
-src/shared/        Shared types, chat payload, context window helpers
+src/renderer/      React UI (IDE, chat, agents, diffs, catalog, canvas)
+src/shared/        Shared types, agents helpers, chat payload, context window helpers
 resources/         Offline tools catalog + icons
 config/            Example settings (no secrets)
 docs/images/       README screenshots
 scripts/           Dev launcher + desktop shortcut installer
 tests/             Vitest unit tests
+NOTICE             Third-party attribution (LocalAGI MIT)
 ```
 
 ---
@@ -384,3 +405,5 @@ tests/             Vitest unit tests
 ## License
 
 MIT
+
+Third-party notices (LocalAGI inspiration): see [`NOTICE`](NOTICE).

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { enabledAgents, normalizeAgentTeam } from '@shared/agents'
 import { useAppStore } from '../../stores/appStore'
 import { DiffReview } from '../DiffReview/DiffReview'
 import { isRemoteMode } from '@shared/providerTools'
@@ -45,11 +46,21 @@ export function ChatPanel() {
   const selectModel = useAppStore((s) => s.selectModel)
   const refreshLm = useAppStore((s) => s.refreshLm)
   const decideEdit = useAppStore((s) => s.decideEdit)
+  const setShow = useAppStore((s) => s.setShow)
+  const activeAgentName = useAppStore((s) => s.activeAgentName)
+  const updateSettings = useAppStore((s) => s.updateSettings)
 
   const contextFiles = useMemo(
     () => openFiles.filter((f) => selectedContext.includes(f.path)),
     [openFiles, selectedContext]
   )
+
+  const team = useMemo(() => normalizeAgentTeam(settings.agentTeam), [settings.agentTeam])
+  const featureOn = settings.enabledTools['optional-multi-agent'] !== false
+  const multiOn = featureOn && team.enabled
+  const roleNames = enabledAgents(team)
+    .map((a) => a.name)
+    .join(' → ')
 
   const disconnected = !lmStatus || lmStatus.status !== 'connected'
   const remote = isRemoteMode(settings.provider)
@@ -68,14 +79,24 @@ export function ChatPanel() {
   return (
     <div className="panel ai-panel">
       <div className="panel-header">
-        <span>Assistant</span>
-        <button
-          className="btn ghost"
-          onClick={() => refreshLm()}
-          title={remote ? 'Test remote API connection' : 'Test LM Studio connection'}
-        >
-          Refresh
-        </button>
+        <span>Assistant{multiOn ? ' · team' : ''}</span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className={`btn ${multiOn ? 'primary' : 'ghost'}`}
+            type="button"
+            onClick={() => setShow('showAgentsPanel', true)}
+            title="Configure multi-agent team"
+          >
+            Agents
+          </button>
+          <button
+            className="btn ghost"
+            onClick={() => refreshLm()}
+            title={remote ? 'Test remote API connection' : 'Test LM Studio connection'}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="chat-toolbar">
@@ -101,6 +122,25 @@ export function ChatPanel() {
             ))}
           </select>
         </label>
+        {featureOn && (
+          <label className="chat-multi-toggle" title={roleNames || 'No agents enabled'}>
+            <input
+              type="checkbox"
+              checked={team.enabled}
+              onChange={(e) =>
+                void updateSettings({
+                  agentTeam: { ...team, enabled: e.target.checked }
+                })
+              }
+            />
+            Multi-agent
+            {streaming && activeAgentName
+              ? ` · ${activeAgentName}`
+              : multiOn
+                ? ` · ${roleNames}`
+                : ''}
+          </label>
+        )}
       </div>
 
       <div className="panel-body chat-messages">
@@ -114,8 +154,14 @@ export function ChatPanel() {
           </div>
         )}
         {session?.messages.map((msg) => (
-          <div key={msg.id} className={`msg ${msg.role}`}>
-            <div className="role">{msg.role}</div>
+          <div
+            key={msg.id}
+            className={`msg ${msg.role}${msg.agentRun?.mode === 'multi' ? ' lagi-team-msg' : ''}`}
+          >
+            <div className="role">
+              {msg.role}
+              {msg.agentRun?.mode === 'multi' ? ' · multi-agent' : ''}
+            </div>
             <MessageBody content={msg.content} streaming={streaming && msg.role === 'assistant'} />
             {msg.error && <div className="error-state">{msg.error}</div>}
             {msg.proposedEdits?.map((edit) => (

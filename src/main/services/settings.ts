@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import { normalizeAgentTeam } from '../../shared/agents'
 import type { AppSettings, ChatSession, ProviderSettings } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import { truncateChatSessionForStorage } from '../../shared/messageLimits'
@@ -66,7 +67,8 @@ export class SettingsService {
       provider,
       mcpServers: Array.isArray(settings.mcpServers)
         ? settings.mcpServers
-        : structuredClone(DEFAULT_SETTINGS.mcpServers)
+        : structuredClone(DEFAULT_SETTINGS.mcpServers),
+      agentTeam: normalizeAgentTeam(settings.agentTeam ?? DEFAULT_SETTINGS.agentTeam)
     }
   }
 
@@ -84,7 +86,9 @@ export class SettingsService {
         ...current.toolConfigs,
         ...(partial.toolConfigs ?? {})
       },
-      mcpServers: Array.isArray(partial.mcpServers) ? partial.mcpServers : current.mcpServers
+      mcpServers: Array.isArray(partial.mcpServers) ? partial.mcpServers : current.mcpServers,
+      agentTeam:
+        partial.agentTeam !== undefined ? normalizeAgentTeam(partial.agentTeam) : current.agentTeam
     }
     this.store.set('settings', next)
     return next

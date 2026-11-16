@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { canRunMultiAgent, normalizeAgentTeam, type AgentRole } from '@shared/agents'
 import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
 import type {
   AppSettings,
@@ -47,6 +48,7 @@ interface AppState {
   showCanvas: boolean
   showSearch: boolean
   showMcpPanel: boolean
+  showAgentsPanel: boolean
   searchQuery: string
   terminalLog: string
   pendingCommand: PendingCommand | null
@@ -64,6 +66,7 @@ interface AppState {
   mcpQuery: string
   mcpLoading: boolean
   mcpProbes: Record<string, McpServerProbeResult>
+  activeAgentName: string | null
 
   bootstrap: () => Promise<void>
   openProject: (path?: string) => Promise<void>
@@ -76,6 +79,9 @@ interface AppState {
   refreshLm: () => Promise<void>
   selectModel: (model: string) => Promise<void>
   sendPrompt: (prompt: string) => Promise<void>
+  generateTeam: (
+    description: string
+  ) => Promise<{ ok: true; agents: AgentRole[] } | { ok: false; error: string }>
   cancelPrompt: () => Promise<void>
   decideEdit: (
     edit: ProposedEdit,
@@ -98,7 +104,8 @@ interface AppState {
       | 'showSettings'
       | 'showCanvas'
       | 'showSearch'
-      | 'showMcpPanel',
+      | 'showMcpPanel'
+      | 'showAgentsPanel',
     value: boolean
   ) => void
   setCatalogFilters: (query: string, category: string) => void
@@ -125,6 +132,11 @@ function emptySession(workspacePath?: string): ChatSession {
   }
 }
 
+function enabledAgentsLabel(agents: AgentRole[]): string {
+  const names = agents.filter((a) => a.enabled !== false).map((a) => a.name)
+  return names.length ? names.join(' → ') : 'team'
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   settings: structuredClone(DEFAULT_SETTINGS),
   workspaceRoot: null,
@@ -146,6 +158,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   showCanvas: false,
   showSearch: false,
   showMcpPanel: false,
+  showAgentsPanel: false,
   searchQuery: '',
   terminalLog: '',
   pendingCommand: null,
@@ -158,6 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   radialPos: null,
   selectionText: '',
   syntaxDimming: false,
+  activeAgentName: null,
   ghostIndex: 0,
   canvasFocusPath: null,
   mcpQuery: '',
@@ -329,6 +343,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
 
+    const settings = get().settings
+    const team = normalizeAgentTeam(settings.agentTeam)
+    const featureOn = settings.enabledTools['optional-multi-agent'] !== false
+    const multiGate = canRunMultiAgent({
+      teamEnabled: team.enabled,
+      featureEnabled: featureOn,
+      model: settings.provider.model,
+      agents: team.agents
+    })
+    const useMulti = team.enabled && featureOn
+    if (useMulti && !multiGate.ok) {
+      set({ error: multiGate.message ?? 'Cannot run multi-agent team.' })
+      return
+    }
+
     const requestId = await window.forge.newId()
     const session = get().session ?? emptySession(get().workspaceRoot ?? undefined)
     const userMsg: ChatMessage = {
@@ -340,7 +369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const openFiles = get().openFiles
-    const provider = get().settings.provider
+    const provider = settings.provider
     const preparedContext = prepareContextFiles(
       openFiles
         .filter((f) => get().selectedContext.includes(f.path))
@@ -379,6 +408,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streaming: true,
       streamBuffer: '',
       requestId,
+      activeAgentName: useMulti ? enabledAgentsLabel(team.agents) : null,
       error: size.message ?? preparedContext.message ?? null
     })
 
@@ -423,6 +453,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const unsub = window.forge.onChatChunk(({ requestId: id, chunk }) => {
       if (id !== requestId) return
+      if (chunk.type === 'agent_start' && chunk.agentName) {
+        set({ activeAgentName: chunk.agentName })
+      }
+      if (chunk.type === 'agent_done') {
+        set({ activeAgentName: chunk.agentName ? `${chunk.agentName} ✓` : null })
+      }
       if (chunk.type === 'delta' && chunk.content) {
         liveBuffer += chunk.content
         flushStreamUi(liveBuffer)
@@ -438,18 +474,34 @@ export const useAppStore = create<AppState>((set, get) => ({
           content: m.content
         }))
 
-      const result = await window.forge.chat({
-        requestId,
-        messages: history,
-        contextFiles
-      })
+      let finalContent = ''
+      let proposedEdits: ProposedEdit[] = []
+      let agentRun: ChatMessage['agentRun']
+
+      if (useMulti) {
+        const teamResult = await window.forge.runTeam({
+          requestId,
+          messages: history,
+          contextFiles
+        })
+        finalContent = teamResult.content || liveBuffer || get().streamBuffer
+        proposedEdits = teamResult.proposedEdits
+        agentRun = teamResult.agentRun
+      } else {
+        const chatResult = await window.forge.chat({
+          requestId,
+          messages: history,
+          contextFiles
+        })
+        finalContent = chatResult.content || liveBuffer || get().streamBuffer
+        proposedEdits = chatResult.proposedEdits
+      }
 
       if (flushTimer) {
         clearTimeout(flushTimer)
         flushTimer = null
       }
 
-      const finalContent = result.content || liveBuffer || get().streamBuffer
       const finalSession: ChatSession = {
         ...get().session!,
         updatedAt: Date.now(),
@@ -458,7 +510,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             ? {
                 ...m,
                 content: finalContent,
-                proposedEdits: result.proposedEdits
+                proposedEdits,
+                ...(agentRun ? { agentRun } : {})
               }
             : m
         )
@@ -468,6 +521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         streamBuffer: finalContent,
         streaming: false,
         requestId: null,
+        activeAgentName: null,
         ghostIndex: 0,
         showAi: true,
         error: preparedContext.message ?? null
@@ -496,6 +550,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         streaming: false,
         requestId: null,
+        activeAgentName: null,
         session: {
           ...get().session!,
           messages: get().session!.messages.map((m) =>
@@ -511,11 +566,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  generateTeam: async (description: string) => {
+    const requestId = await window.forge.newId()
+    return window.forge.generateTeam({ requestId, description })
+  },
+
   cancelPrompt: async () => {
     const id = get().requestId
     if (!id) return
     await window.forge.cancelChat(id)
-    set({ streaming: false, requestId: null })
+    set({ streaming: false, requestId: null, activeAgentName: null })
   },
 
   decideEdit: async (edit, decision, opts) => {

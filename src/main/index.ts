@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'path'
+import { AgentsService } from './services/agents'
 import { CatalogService } from './services/catalog'
 import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
@@ -22,6 +23,7 @@ const settingsService = new SettingsService()
 const lmService = new LmStudioService()
 const catalogService = new CatalogService()
 const mcpService = new McpService()
+const agentsService = new AgentsService(lmService)
 
 function createWindow(): void {
   const settings = settingsService.getSettings()
@@ -135,7 +137,8 @@ app.whenReady().then(() => {
     settings: settingsService,
     lm: lmService,
     catalog: catalogService,
-    mcp: mcpService
+    mcp: mcpService,
+    agents: agentsService
   })
   buildMenu()
   createWindow()

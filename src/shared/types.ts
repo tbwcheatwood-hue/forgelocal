@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_TEAM, type AgentTeamSettings } from './agents'
 import type { McpServerConfig } from './mcp'
 
 export type TrustStatus = 'built-in' | 'optional' | 'third-party'
@@ -73,6 +74,8 @@ export interface AppSettings {
   allowPathsOutsideWorkspace: boolean
   /** Local stdio MCP servers (command + args). No remote credentials invented. */
   mcpServers: McpServerConfig[]
+  /** Cooperative multi-agent team (LocalAGI-inspired). Explicit opt-in. */
+  agentTeam: AgentTeamSettings
 }
 
 export interface FileNode {
@@ -100,6 +103,11 @@ export interface ChatMessage {
   contextFiles?: string[]
   proposedEdits?: ProposedEdit[]
   error?: string
+  /** Present when this assistant message came from a multi-agent team run. */
+  agentRun?: {
+    mode: 'multi'
+    turns: Array<{ agentId: string; agentName: string; content: string; error?: string }>
+  }
 }
 
 export interface ProposedEdit {
@@ -153,9 +161,11 @@ export interface ChatCompletionRequest {
 }
 
 export interface StreamChunk {
-  type: 'delta' | 'done' | 'error' | 'cancelled'
+  type: 'delta' | 'done' | 'error' | 'cancelled' | 'agent_start' | 'agent_done'
   content?: string
   error?: string
+  agentId?: string
+  agentName?: string
 }
 
 export interface CommandApprovalRequest {
@@ -211,5 +221,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enabledTools: {},
   toolConfigs: {},
   allowPathsOutsideWorkspace: false,
-  mcpServers: []
+  mcpServers: [],
+  agentTeam: structuredClone(DEFAULT_AGENT_TEAM)
 }
