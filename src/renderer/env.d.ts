@@ -8,6 +8,7 @@ import type {
   HardwareInventory
 } from '../shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
+import type { CheckpointMeta, ProjectPlan, ProjectRecord, ProjectStack } from '../shared/projectGen'
 import type {
   AppSettings,
   CatalogFilter,
@@ -121,6 +122,39 @@ export interface ForgeApi {
   removeMcpServer: (id: string) => Promise<AppSettings>
   probeMcpServer: (id: string) => Promise<McpServerProbeResult>
   probeAllMcpServers: () => Promise<Record<string, McpServerProbeResult>>
+  planProject: (payload: {
+    requestId: string
+    description: string
+    answers?: Record<string, string>
+    stackHint?: ProjectStack
+    preferTemplate?: boolean
+  }) => Promise<{ ok: true; plan: ProjectPlan } | { ok: false; error: string; plan?: ProjectPlan }>
+  pickProjectParent: () => Promise<string | null>
+  materializeProject: (
+    parentDir: string,
+    plan: ProjectPlan
+  ) => Promise<
+    | {
+        ok: true
+        root: string
+        record: ProjectRecord
+        filesWritten: number
+        tree: FileNode
+        hasGit: boolean
+      }
+    | { ok: false; error: string }
+  >
+  createCheckpoint: (
+    label?: string
+  ) => Promise<{ ok: true; meta: CheckpointMeta } | { ok: false; error: string }>
+  listCheckpoints: () => Promise<CheckpointMeta[]>
+  restoreCheckpoint: (
+    id: string
+  ) => Promise<{ ok: true; restored: number; tree?: FileNode } | { ok: false; error: string }>
+  exportProjectZip: () => Promise<
+    { ok: true; path: string; bytes: number } | { ok: false; error: string }
+  >
+  rememberedProjects: () => Promise<ProjectRecord[]>
   onMenu: (channel: string, cb: () => void) => () => void
 }
 

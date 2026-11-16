@@ -8,6 +8,7 @@ import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
 import { McpService } from './services/mcp'
 import { PreviewService } from './services/preview'
+import { ProjectGenService } from './services/projectGen'
 import { SettingsService } from './services/settings'
 import { resolveAppIcon } from './iconPath'
 import { registerIpc } from './ipc/register'
@@ -30,6 +31,7 @@ const agentsService = new AgentsService(lmService)
 const companionService = new CompanionService()
 const previewService = new PreviewService()
 const attachmentsService = new AttachmentsService()
+const projectGenService = new ProjectGenService(lmService, fileService, settingsService)
 
 function createWindow(): void {
   const settings = settingsService.getSettings()
@@ -78,6 +80,11 @@ function buildMenu(): void {
           label: 'Open Project…',
           accelerator: 'CmdOrCtrl+O',
           click: () => mainWindow?.webContents.send('menu:open-project')
+        },
+        {
+          label: 'New AI Project…',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => mainWindow?.webContents.send('menu:new-ai-project')
         },
         {
           label: 'Save',
@@ -147,7 +154,8 @@ app.whenReady().then(() => {
     agents: agentsService,
     companion: companionService,
     preview: previewService,
-    attachments: attachmentsService
+    attachments: attachmentsService,
+    projectGen: projectGenService
   })
   buildMenu()
   createWindow()

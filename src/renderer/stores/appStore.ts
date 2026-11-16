@@ -14,6 +14,7 @@ import type {
   HardwareInventory
 } from '@shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
+import type { CheckpointMeta, ProjectPlan, ProjectRecord, ProjectStack } from '@shared/projectGen'
 import type {
   AppSettings,
   CatalogItem,
@@ -65,6 +66,12 @@ interface AppState {
   showAgentsPanel: boolean
   showCompanionPanel: boolean
   showPreview: boolean
+  showProjectWizard: boolean
+  showProjectPanel: boolean
+  projectPlan: ProjectPlan | null
+  projectGenBusy: boolean
+  checkpoints: CheckpointMeta[]
+  rememberedProjects: ProjectRecord[]
   searchQuery: string
   terminalLog: string
   pendingCommand: PendingCommand | null
@@ -134,7 +141,9 @@ interface AppState {
       | 'showMcpPanel'
       | 'showAgentsPanel'
       | 'showCompanionPanel'
-      | 'showPreview',
+      | 'showPreview'
+      | 'showProjectWizard'
+      | 'showProjectPanel',
     value: boolean
   ) => void
   setCatalogFilters: (query: string, category: string) => void
@@ -157,6 +166,20 @@ interface AppState {
   refreshGit: () => Promise<void>
   startPreview: (previewDir?: string) => Promise<void>
   stopPreview: () => Promise<void>
+  openProjectWizard: () => void
+  closeProjectWizard: () => void
+  planAiProject: (input: {
+    description: string
+    answers?: Record<string, string>
+    stackHint?: ProjectStack
+    preferTemplate?: boolean
+  }) => Promise<ProjectPlan | null>
+  materializeAiProject: (plan: ProjectPlan) => Promise<boolean>
+  refreshCheckpoints: () => Promise<void>
+  createProjectCheckpoint: (label?: string) => Promise<void>
+  restoreProjectCheckpoint: (id: string) => Promise<void>
+  exportOpenProject: () => Promise<void>
+  refreshRememberedProjects: () => Promise<void>
 }
 
 function emptySession(workspacePath?: string): ChatSession {
@@ -200,6 +223,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   showAgentsPanel: false,
   showCompanionPanel: false,
   showPreview: false,
+  showProjectWizard: false,
+  showProjectPanel: false,
+  projectPlan: null,
+  projectGenBusy: false,
+  checkpoints: [],
+  rememberedProjects: [],
   searchQuery: '',
   terminalLog: '',
   pendingCommand: null,
@@ -253,6 +282,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       showCanvas: false
     })
     await get().refreshLm()
+    await get().refreshRememberedProjects()
   },
 
   openProject: async (path?: string) => {
@@ -268,8 +298,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         selectedContext: [],
         session: emptySession(result.root),
         error: null,
-        settings: await window.forge.getSettings()
+        settings: await window.forge.getSettings(),
+        showProjectWizard: false
       })
+      await get().refreshCheckpoints()
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) })
     }
@@ -998,6 +1030,142 @@ export const useAppStore = create<AppState>((set, get) => ({
         mcpLoading: false,
         error: err instanceof Error ? err.message : String(err)
       })
+    }
+  },
+
+  openProjectWizard: () => set({ showProjectWizard: true, error: null }),
+  closeProjectWizard: () => set({ showProjectWizard: false }),
+
+  planAiProject: async (input) => {
+    set({ projectGenBusy: true, error: null })
+    try {
+      const requestId = await window.forge.newId()
+      const result = await window.forge.planProject({ requestId, ...input })
+      if (!result.ok || !result.plan) {
+        set({
+          projectGenBusy: false,
+          error: result.ok === false ? result.error : 'Planning failed'
+        })
+        return result.plan ?? null
+      }
+      set({ projectPlan: result.plan, projectGenBusy: false })
+      return result.plan
+    } catch (err) {
+      set({
+        projectGenBusy: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+      return null
+    }
+  },
+
+  materializeAiProject: async (plan) => {
+    set({ projectGenBusy: true, error: null })
+    try {
+      const parent = await window.forge.pickProjectParent()
+      if (!parent) {
+        set({ projectGenBusy: false })
+        return false
+      }
+      const result = await window.forge.materializeProject(parent, plan)
+      if (!result.ok) {
+        set({ projectGenBusy: false, error: result.error })
+        return false
+      }
+      set({
+        workspaceRoot: result.root,
+        tree: result.tree,
+        hasGit: result.hasGit,
+        openFiles: [],
+        activePath: null,
+        selectedContext: [],
+        session: emptySession(result.root),
+        projectGenBusy: false,
+        showProjectWizard: false,
+        projectPlan: plan,
+        settings: await window.forge.getSettings(),
+        error: null
+      })
+      await get().refreshCheckpoints()
+      await get().refreshRememberedProjects()
+      // Open README or index when present
+      const prefer = ['README.md', 'index.html', 'package.json', 'app.js']
+      const findPrefer = (node: FileNode | null): string | null => {
+        if (!node?.children) return null
+        for (const name of prefer) {
+          const hit = node.children.find((c) => !c.isDirectory && c.name === name)
+          if (hit) return hit.path
+        }
+        const firstFile = node.children.find((c) => !c.isDirectory)
+        return firstFile?.path ?? null
+      }
+      const openPath = findPrefer(result.tree)
+      if (openPath) await get().openFile(openPath)
+      return true
+    } catch (err) {
+      set({
+        projectGenBusy: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+      return false
+    }
+  },
+
+  refreshCheckpoints: async () => {
+    try {
+      const checkpoints = await window.forge.listCheckpoints()
+      set({ checkpoints })
+    } catch {
+      set({ checkpoints: [] })
+    }
+  },
+
+  createProjectCheckpoint: async (label) => {
+    try {
+      const result = await window.forge.createCheckpoint(label)
+      if (!result.ok) {
+        set({ error: result.error })
+        return
+      }
+      await get().refreshCheckpoints()
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  restoreProjectCheckpoint: async (id) => {
+    try {
+      const result = await window.forge.restoreCheckpoint(id)
+      if (!result.ok) {
+        if (result.error !== 'Cancelled') set({ error: result.error })
+        return
+      }
+      if (result.tree) set({ tree: result.tree, openFiles: [], activePath: null })
+      await get().refreshCheckpoints()
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  exportOpenProject: async () => {
+    try {
+      const result = await window.forge.exportProjectZip()
+      if (!result.ok) {
+        if (result.error !== 'Cancelled') set({ error: result.error })
+        return
+      }
+      set({ error: null })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  refreshRememberedProjects: async () => {
+    try {
+      const rememberedProjects = await window.forge.rememberedProjects()
+      set({ rememberedProjects })
+    } catch {
+      set({ rememberedProjects: [] })
     }
   }
 }))

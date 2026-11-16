@@ -10,6 +10,8 @@ import { SettingsModal } from './components/Settings/SettingsModal'
 import { Welcome } from './components/Welcome/Welcome'
 import { CanvasView } from './components/Canvas/CanvasView'
 import { PreviewPanel } from './components/Preview/PreviewPanel'
+import { ProjectWizard } from './components/Project/ProjectWizard'
+import { ProjectPanel } from './components/Project/ProjectPanel'
 import { useAppStore } from './stores/appStore'
 
 export default function App() {
@@ -21,6 +23,7 @@ export default function App() {
   const error = useAppStore((s) => s.error)
   const setShow = useAppStore((s) => s.setShow)
   const openProject = useAppStore((s) => s.openProject)
+  const openProjectWizard = useAppStore((s) => s.openProjectWizard)
   const saveActive = useAppStore((s) => s.saveActive)
   const setError = useAppStore((s) => s.setError)
 
@@ -82,6 +85,7 @@ export default function App() {
   useEffect(() => {
     const offs = [
       window.forge.onMenu('open-project', () => void openProject()),
+      window.forge.onMenu('new-ai-project', () => openProjectWizard()),
       window.forge.onMenu('save', () => void saveActive()),
       window.forge.onMenu('toggle-ai', () => setShow('showAi', !useAppStore.getState().showAi)),
       window.forge.onMenu('toggle-terminal', () =>
@@ -91,7 +95,7 @@ export default function App() {
       window.forge.onMenu('lm-help', () => setShow('showSettings', true))
     ]
     return () => offs.forEach((off) => off())
-  }, [openProject, saveActive, setShow])
+  }, [openProject, openProjectWizard, saveActive, setShow])
 
   return (
     <div className="app-shell">
@@ -121,6 +125,8 @@ export default function App() {
       <StatusBar />
       <CatalogModal />
       <SettingsModal />
+      <ProjectWizard />
+      <ProjectPanel />
       {error && (
         <div
           className="modal-backdrop"

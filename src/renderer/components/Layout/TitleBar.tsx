@@ -3,11 +3,13 @@ import { useAppStore } from '../../stores/appStore'
 export function TitleBar() {
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openProject = useAppStore((s) => s.openProject)
+  const openProjectWizard = useAppStore((s) => s.openProjectWizard)
   const saveActive = useAppStore((s) => s.saveActive)
   const setShow = useAppStore((s) => s.setShow)
   const showAi = useAppStore((s) => s.showAi)
   const showTerminal = useAppStore((s) => s.showTerminal)
   const showCanvas = useAppStore((s) => s.showCanvas)
+  const showProjectPanel = useAppStore((s) => s.showProjectPanel)
   const lmStatus = useAppStore((s) => s.lmStatus)
   const refreshLm = useAppStore((s) => s.refreshLm)
 
@@ -25,12 +27,23 @@ export function TitleBar() {
           <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
           <span>LM Studio</span>
         </span>
+        <button className="btn ghost" onClick={() => openProjectWizard()}>
+          New
+        </button>
         <button className="btn ghost" onClick={() => openProject()}>
           Open
         </button>
         <button className="btn ghost" onClick={() => saveActive()}>
           Save
         </button>
+        {workspaceRoot && (
+          <button
+            className={`btn ${showProjectPanel ? '' : 'ghost'}`}
+            onClick={() => setShow('showProjectPanel', !showProjectPanel)}
+          >
+            Project
+          </button>
+        )}
         <button
           className={`btn ${showAi ? '' : 'ghost'}`}
           onClick={() => setShow('showAi', !showAi)}
