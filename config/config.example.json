@@ -17,5 +17,6 @@
     "builtin-search": true
   },
   "toolConfigs": {},
-  "allowPathsOutsideWorkspace": false
+  "allowPathsOutsideWorkspace": false,
+  "mcpServers": []
 }

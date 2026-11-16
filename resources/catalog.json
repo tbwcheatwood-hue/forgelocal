@@ -145,15 +145,39 @@
   },
   {
     "id": "thirdparty-mcp-dock",
-    "name": "MCP Tool Dock (Preview)",
-    "description": "Honest MCP tool cards in the dock. Lists catalog MCP entries; does not run a live MCP server runtime yet.",
+    "name": "MCP Tool Dock",
+    "description": "Browse the MCP catalog and connect local stdio MCP servers (command + args). Lists tools; does not invent remote credentials.",
     "category": "ai-tools",
-    "tags": ["mcp", "preview", "third-party"],
+    "tags": ["mcp", "dock", "local", "third-party"],
     "trust": "third-party",
-    "source": "bundled-stub",
-    "implemented": false,
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "installGuidance": "Enable this item, open the MCP chip in the tool dock, then Add server with a local command (e.g. npx -y @modelcontextprotocol/server-filesystem /path). Refresh tools to probe over stdio."
+  },
+  {
+    "id": "builtin-mcp-stdio",
+    "name": "Local stdio MCP client",
+    "description": "Built-in client that spawns user-configured local MCP servers and calls initialize + tools/list.",
+    "category": "ai-tools",
+    "tags": ["mcp", "stdio", "local", "built-in"],
+    "trust": "built-in",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "installGuidance": "No separate install. Configure servers in the MCP dock. Tool invocation beyond listing is not executed automatically."
+  },
+  {
+    "id": "optional-mcp-filesystem-example",
+    "name": "Filesystem MCP (example)",
+    "description": "Example local MCP server using the official filesystem package via npx. Configure path yourself.",
+    "category": "ai-tools",
+    "tags": ["mcp", "filesystem", "example", "local"],
+    "trust": "optional",
+    "source": "docs",
+    "implemented": true,
     "enabledByDefault": false,
-    "installGuidance": "Open the MCP chip in the tool dock for status. Not executable in this build — no silent remote MCP bridge."
+    "installGuidance": "In MCP dock → Add server: command=npx, args=-y @modelcontextprotocol/server-filesystem /absolute/workspace/path. Requires network only for the first npx fetch; runtime is local stdio."
   },
   {
     "id": "thirdparty-remote-models",

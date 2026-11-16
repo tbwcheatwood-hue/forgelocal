@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
-import { buildMcpDockSnapshot, canUseOnlineTools, isRemoteMode } from '@shared/providerTools'
+import { buildMcpDockSnapshot } from '@shared/mcp'
+import { canUseOnlineTools, isRemoteMode } from '@shared/providerTools'
+import { McpPanel } from './McpPanel'
 
 /** Bottom dock: provider / MCP / online tools / pop-out / context budget. */
 export function ToolDock() {
@@ -11,12 +13,23 @@ export function ToolDock() {
   const streaming = useAppStore((s) => s.streaming)
   const catalog = useAppStore((s) => s.catalog)
   const showMcpPanel = useAppStore((s) => s.showMcpPanel)
+  const mcpProbes = useAppStore((s) => s.mcpProbes)
+  const mcpLoading = useAppStore((s) => s.mcpLoading)
   const setShow = useAppStore((s) => s.setShow)
   const refreshLm = useAppStore((s) => s.refreshLm)
   const popoutIde = useAppStore((s) => s.popoutIde)
   const setCatalogFilters = useAppStore((s) => s.setCatalogFilters)
 
-  const mcp = useMemo(() => buildMcpDockSnapshot(catalog), [catalog])
+  const mcp = useMemo(
+    () =>
+      buildMcpDockSnapshot({
+        catalog,
+        enabledTools: settings.enabledTools,
+        servers: settings.mcpServers ?? [],
+        probes: mcpProbes
+      }),
+    [catalog, settings.enabledTools, settings.mcpServers, mcpProbes]
+  )
   const onlineOk = canUseOnlineTools(settings)
   const remote = isRemoteMode(settings.provider)
   const onlineEnabled = Boolean(settings.enabledTools['optional-online-extensions'])
@@ -27,11 +40,17 @@ export function ToolDock() {
   const approxTokens = Math.round(chars / 4)
 
   const mcpDot =
-    mcp.status === 'ready'
-      ? 'connected'
-      : mcp.status === 'stub' || mcp.status === 'empty'
-        ? 'unknown'
-        : 'error'
+    mcpLoading || mcp.status === 'loading'
+      ? 'unknown'
+      : mcp.status === 'ready'
+        ? 'connected'
+        : mcp.status === 'configured'
+          ? 'no-model'
+          : mcp.status === 'error'
+            ? 'error'
+            : mcp.status === 'stub' || mcp.status === 'empty' || mcp.status === 'unavailable'
+              ? 'unknown'
+              : 'unknown'
 
   return (
     <div className="tool-dock-wrap">
@@ -45,14 +64,14 @@ export function ToolDock() {
         </button>
 
         <button
-          className={`dock-chip ${showMcpPanel ? 'active' : 'muted'}`}
+          className={`dock-chip ${showMcpPanel ? 'active' : ''}`}
           onClick={() => setShow('showMcpPanel', !showMcpPanel)}
           title={mcp.message}
           aria-expanded={showMcpPanel}
         >
           <span className={`status-dot ${mcpDot}`} />
           <span className="dock-label">MCP</span>
-          <span className="dock-meta">{mcp.status}</span>
+          <span className="dock-meta">{mcpLoading ? 'loading' : mcp.status}</span>
         </button>
 
         {onlineOk ? (
@@ -111,33 +130,7 @@ export function ToolDock() {
         </div>
       </div>
 
-      {showMcpPanel && (
-        <div className="mcp-panel" role="region" aria-label="MCP tools">
-          <div className="mcp-panel-header">
-            <strong>MCP tools</strong>
-            <span className={`mcp-status ${mcp.status}`}>{mcp.status}</span>
-            <button className="btn ghost" onClick={() => setShow('showMcpPanel', false)}>
-              Close
-            </button>
-          </div>
-          <p className="mcp-panel-msg">{mcp.message}</p>
-          {mcp.tools.length === 0 ? (
-            <div className="empty-state">No MCP catalog entries.</div>
-          ) : (
-            <ul className="mcp-tool-list">
-              {mcp.tools.map((tool) => (
-                <li key={tool.id} className={tool.available ? 'available' : 'unavailable'}>
-                  <div className="mcp-tool-name">
-                    <span className={`status-dot ${tool.available ? 'connected' : 'unknown'}`} />
-                    {tool.name}
-                  </div>
-                  <div className="mcp-tool-reason">{tool.reason}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {showMcpPanel && <McpPanel />}
     </div>
   )
 }

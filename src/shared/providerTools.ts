@@ -1,19 +1,7 @@
 import type { AppSettings, CatalogItem, ProviderSettings } from './types'
 
-export type McpDockStatus = 'unavailable' | 'empty' | 'stub' | 'ready'
-
-export interface McpDockToolRow {
-  id: string
-  name: string
-  available: boolean
-  reason: string
-}
-
-export interface McpDockSnapshot {
-  status: McpDockStatus
-  message: string
-  tools: McpDockToolRow[]
-}
+export type { McpDockSnapshot, McpDockStatus } from './mcp'
+export { buildMcpDockSnapshot, isMcpCatalogItem, validateMcpServerConfig } from './mcp'
 
 export function isRemoteMode(provider: Pick<ProviderSettings, 'mode'>): boolean {
   return provider.mode === 'remote'
@@ -28,42 +16,6 @@ export function catalogItemRequiresRemote(item: CatalogItem): boolean {
   if (item.requiresRemote === true) return true
   if (item.requiresRemote === false) return false
   return item.tags.some((t) => t === 'online' || t === 'cloud' || t === 'remote-online')
-}
-
-export function buildMcpDockSnapshot(catalog: CatalogItem[]): McpDockSnapshot {
-  const tools = catalog
-    .filter((item) => item.tags.includes('mcp') || item.id.includes('mcp'))
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      available: item.implemented,
-      reason: item.implemented
-        ? 'Implemented in this build'
-        : item.installGuidance || 'Not executable in this build'
-    }))
-
-  if (tools.length === 0) {
-    return {
-      status: 'empty',
-      message: 'No MCP-related catalog entries found.',
-      tools: []
-    }
-  }
-
-  const anyReady = tools.some((t) => t.available)
-  if (anyReady) {
-    return {
-      status: 'ready',
-      message: 'MCP tools available from the local catalog.',
-      tools
-    }
-  }
-
-  return {
-    status: 'stub',
-    message: 'MCP dock is a catalog preview only — no live MCP runtime is connected in this build.',
-    tools
-  }
 }
 
 /** Disable any enabled tools that require remote when switching back to local. */

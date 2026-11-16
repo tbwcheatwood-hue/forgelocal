@@ -35,7 +35,10 @@ export class SettingsService {
     return {
       ...structuredClone(DEFAULT_SETTINGS),
       ...settings,
-      provider
+      provider,
+      mcpServers: Array.isArray(settings.mcpServers)
+        ? settings.mcpServers
+        : structuredClone(DEFAULT_SETTINGS.mcpServers)
     }
   }
 
@@ -55,7 +58,8 @@ export class SettingsService {
       toolConfigs: {
         ...current.toolConfigs,
         ...(partial.toolConfigs ?? {})
-      }
+      },
+      mcpServers: Array.isArray(partial.mcpServers) ? partial.mcpServers : current.mcpServers
     }
     this.store.set('settings', next)
     return next

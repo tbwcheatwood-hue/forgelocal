@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
 import type {
   AppSettings,
   CatalogItem,
@@ -59,6 +60,9 @@ interface AppState {
   syntaxDimming: boolean
   ghostIndex: number
   canvasFocusPath: string | null
+  mcpQuery: string
+  mcpLoading: boolean
+  mcpProbes: Record<string, McpServerProbeResult>
 
   bootstrap: () => Promise<void>
   openProject: (path?: string) => Promise<void>
@@ -105,6 +109,10 @@ interface AppState {
   setCanvasFocusPath: (path: string | null) => void
   popoutIde: () => Promise<void>
   applyPopoutBootstrap: () => Promise<void>
+  setMcpQuery: (query: string) => void
+  upsertMcpServer: (input: Partial<McpServerConfig>) => Promise<void>
+  removeMcpServer: (id: string) => Promise<void>
+  refreshMcpTools: (serverId?: string) => Promise<void>
 }
 
 function emptySession(workspacePath?: string): ChatSession {
@@ -153,6 +161,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   syntaxDimming: false,
   ghostIndex: 0,
   canvasFocusPath: null,
+  mcpQuery: '',
+  mcpLoading: false,
+  mcpProbes: {},
 
   bootstrap: async () => {
     let settings = await window.forge.getSettings()
@@ -162,7 +173,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     for (const id of [
       'optional-ambient-radial',
       'optional-syntax-dimming',
-      'optional-canvas'
+      'optional-canvas',
+      'thirdparty-mcp-dock',
+      'builtin-mcp-stdio'
     ] as const) {
       if (settings.enabledTools[id] === undefined) stretchPatch[id] = true
     }
@@ -680,7 +693,51 @@ export const useAppStore = create<AppState>((set, get) => ({
   setRadialOpen: (open, pos = null) => set({ radialOpen: open, radialPos: open ? pos : null }),
   setSelectionText: (text) => set({ selectionText: text }),
   setGhostIndex: (index) => set({ ghostIndex: index }),
-  setCanvasFocusPath: (path) => set({ canvasFocusPath: path })
+  setCanvasFocusPath: (path) => set({ canvasFocusPath: path }),
+
+  setMcpQuery: (query) => set({ mcpQuery: query }),
+
+  upsertMcpServer: async (input) => {
+    try {
+      const settings = await window.forge.upsertMcpServer(input)
+      set({ settings, error: null })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  removeMcpServer: async (id) => {
+    try {
+      const settings = await window.forge.removeMcpServer(id)
+      const probes = { ...get().mcpProbes }
+      delete probes[id]
+      set({ settings, mcpProbes: probes, error: null })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  refreshMcpTools: async (serverId) => {
+    set({ mcpLoading: true })
+    try {
+      if (serverId) {
+        const probe = await window.forge.probeMcpServer(serverId)
+        set({
+          mcpProbes: { ...get().mcpProbes, [serverId]: probe },
+          mcpLoading: false,
+          error: probe.status === 'error' ? probe.message : null
+        })
+      } else {
+        const probes = await window.forge.probeAllMcpServers()
+        set({ mcpProbes: probes, mcpLoading: false, error: null })
+      }
+    } catch (err) {
+      set({
+        mcpLoading: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
 }))
 
 export function isPopoutWindow(): boolean {

@@ -117,9 +117,17 @@ npm run package
 
 ## Tool dock
 
-- **MCP:** Honest status panel (`stub` / `empty` / `ready`). This build does not run a live MCP server runtime
+- **MCP:** Catalog browser + local **stdio** MCP servers (configure command/args, probe `initialize` + `tools/list`). Tool _invocation_ is not auto-run.
 - **Online:** Visible/usable only with an active remote model
 - **Pop-out IDE:** Opens a second BrowserWindow and restores workspace + open file paths when possible (unsaved buffer text is not cloned)
+
+### Add a local MCP server
+
+1. Open a project, click **MCP** in the tool dock
+2. **Add server** with a local command, e.g.:
+   - Fixture: `command=node`, `args=tests/fixtures/fake-mcp-server.mjs` (from repo root)
+   - Filesystem example: `command=npx`, `args=-y @modelcontextprotocol/server-filesystem /abs/path`
+3. Click **Refresh tools** / **Probe** to list tools over stdio (no remote credentials invented)
 
 ### Troubleshooting
 

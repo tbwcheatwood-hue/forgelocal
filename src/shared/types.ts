@@ -1,3 +1,5 @@
+import type { McpServerConfig } from './mcp'
+
 export type TrustStatus = 'built-in' | 'optional' | 'third-party'
 
 export type CatalogCategory =
@@ -53,6 +55,8 @@ export interface AppSettings {
   enabledTools: Record<string, boolean>
   toolConfigs: Record<string, Record<string, unknown>>
   allowPathsOutsideWorkspace: boolean
+  /** Local stdio MCP servers (command + args). No remote credentials invented. */
+  mcpServers: McpServerConfig[]
 }
 
 export interface FileNode {
@@ -178,5 +182,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recentProjects: [],
   enabledTools: {},
   toolConfigs: {},
-  allowPathsOutsideWorkspace: false
+  allowPathsOutsideWorkspace: false,
+  mcpServers: []
 }

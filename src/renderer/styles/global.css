@@ -1454,9 +1454,89 @@ select:focus-visible,
 }
 
 .mcp-panel {
-  padding: 10px 12px 12px;
+  padding: 10px 12px 14px;
   border-top: 1px solid var(--border-soft);
   background: rgba(18, 15, 13, 0.96);
+  max-height: min(52vh, 520px);
+  overflow: auto;
+}
+
+.mcp-search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mcp-search-row input {
+  flex: 1;
+}
+
+.mcp-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .mcp-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mcp-section-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.mcp-pill {
+  margin-left: 8px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.mcp-pill.on {
+  color: var(--accent);
+  border-color: rgba(224, 160, 106, 0.35);
+}
+
+.mcp-live-tools {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.mcp-add-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(26, 23, 20, 0.55);
+}
+
+.mcp-add-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.mcp-status.configured {
+  color: var(--accent);
+}
+
+.mcp-status.loading {
+  color: var(--text-dim);
 }
 
 .mcp-panel-header {

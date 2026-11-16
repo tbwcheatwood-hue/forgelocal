@@ -14,10 +14,13 @@ import {
   isRemoteMode
 } from '../../shared/providerTools'
 import { checkPromptSize, prepareContextFiles, PROMPT_MAX_CHARS } from '../../shared/messageLimits'
+import type { McpServerConfig } from '../../shared/mcp'
+import { validateMcpServerConfig } from '../../shared/mcp'
 import { CatalogService } from '../services/catalog'
 import { parseProposedEdits } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
 import { LmStudioService } from '../services/lmstudio'
+import { McpService } from '../services/mcp'
 import { SettingsService } from '../services/settings'
 import { validateCommandSafety } from '../services/security'
 import { resolveAppIcon } from '../iconPath'
@@ -27,6 +30,7 @@ export interface Services {
   settings: SettingsService
   lm: LmStudioService
   catalog: CatalogService
+  mcp: McpService
 }
 
 let popoutWindow: BrowserWindow | null = null
@@ -83,7 +87,7 @@ function createPopoutBrowserWindow(): BrowserWindow {
 }
 
 export function registerIpc(services: Services): void {
-  const { fs: fileService, settings, lm, catalog } = services
+  const { fs: fileService, settings, lm, catalog, mcp } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
   ipcMain.handle('settings:update', (_e, partial: Partial<AppSettings>) => {
@@ -236,6 +240,37 @@ export function registerIpc(services: Services): void {
       enabledTools: { ...current.enabledTools, [id]: enabled }
     })
     return applySettingsSideEffects(fileService, settings, catalog, next)
+  })
+
+  ipcMain.handle('mcp:listServers', () => settings.getSettings().mcpServers ?? [])
+
+  ipcMain.handle('mcp:upsertServer', (_e, input: Partial<McpServerConfig>) => {
+    const validated = validateMcpServerConfig(input)
+    if (!validated.ok) throw new Error(validated.error)
+    const current = settings.getSettings()
+    const servers = [...(current.mcpServers ?? [])]
+    const idx = servers.findIndex((s) => s.id === validated.config.id)
+    if (idx >= 0) servers[idx] = validated.config
+    else servers.push(validated.config)
+    return settings.updateSettings({ mcpServers: servers })
+  })
+
+  ipcMain.handle('mcp:removeServer', (_e, id: string) => {
+    const current = settings.getSettings()
+    return settings.updateSettings({
+      mcpServers: (current.mcpServers ?? []).filter((s) => s.id !== id)
+    })
+  })
+
+  ipcMain.handle('mcp:probeServer', async (_e, id: string) => {
+    const server = (settings.getSettings().mcpServers ?? []).find((s) => s.id === id)
+    if (!server) throw new Error('Unknown MCP server')
+    return mcp.probeServer(server)
+  })
+
+  ipcMain.handle('mcp:probeAll', async () => {
+    const servers = settings.getSettings().mcpServers ?? []
+    return mcp.probeAll(servers)
   })
 
   ipcMain.handle('window:popoutIde', (_e, state: PopoutBootstrap) => {

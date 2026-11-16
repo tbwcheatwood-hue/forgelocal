@@ -1,3 +1,4 @@
+import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
 import type {
   AppSettings,
   CatalogFilter,
@@ -64,6 +65,11 @@ export interface ForgeApi {
   popoutIde: (state: PopoutBootstrap) => Promise<{ ok: true; reused: boolean }>
   getPopoutBootstrap: () => Promise<PopoutBootstrap | null>
   onPopoutRefresh: (cb: (state: PopoutBootstrap) => void) => () => void
+  listMcpServers: () => Promise<McpServerConfig[]>
+  upsertMcpServer: (input: Partial<McpServerConfig>) => Promise<AppSettings>
+  removeMcpServer: (id: string) => Promise<AppSettings>
+  probeMcpServer: (id: string) => Promise<McpServerProbeResult>
+  probeAllMcpServers: () => Promise<Record<string, McpServerProbeResult>>
   onMenu: (channel: string, cb: () => void) => () => void
 }
 

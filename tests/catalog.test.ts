@@ -22,8 +22,9 @@ describe('offline tools catalog', () => {
   })
 
   it('distinguishes implemented vs stub items', () => {
-    const stubs = catalog.search({ query: 'mcp' })
-    expect(stubs[0]?.implemented).toBe(false)
+    const mcpHits = catalog.search({ query: 'mcp' })
+    expect(mcpHits.some((i) => i.id === 'thirdparty-mcp-dock' && i.implemented)).toBe(true)
+    expect(mcpHits.some((i) => i.id === 'builtin-mcp-stdio' && i.implemented)).toBe(true)
     const builtin = catalog.get('builtin-lmstudio')
     expect(builtin?.implemented).toBe(true)
     expect(builtin?.trust).toBe('built-in')

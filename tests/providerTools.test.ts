@@ -24,17 +24,17 @@ const onlineItem: CatalogItem = {
   installGuidance: 'needs remote'
 }
 
-const mcpStub: CatalogItem = {
+const mcpItem: CatalogItem = {
   id: 'thirdparty-mcp-dock',
-  name: 'MCP Tool Dock (Preview)',
-  description: 'stub',
+  name: 'MCP Tool Dock',
+  description: 'mcp',
   category: 'ai-tools',
-  tags: ['mcp', 'preview'],
+  tags: ['mcp', 'dock'],
   trust: 'third-party',
-  source: 'bundled-stub',
-  implemented: false,
-  enabledByDefault: false,
-  installGuidance: 'Not executable'
+  source: 'bundled',
+  implemented: true,
+  enabledByDefault: true,
+  installGuidance: 'local stdio'
 }
 
 const remoteModels: CatalogItem = {
@@ -100,30 +100,30 @@ describe('provider / online tool gating', () => {
         model: '',
         enabledTools: { 'optional-online-extensions': true, 'builtin-terminal': true }
       }),
-      [onlineItem, mcpStub]
+      [onlineItem, mcpItem]
     )
     expect(next.enabledTools['optional-online-extensions']).toBe(false)
     expect(next.enabledTools['builtin-terminal']).toBe(true)
   })
 })
 
-describe('MCP dock snapshot', () => {
-  it('reports stub when MCP entries exist but none are implemented', () => {
-    const snap = buildMcpDockSnapshot([mcpStub])
-    expect(snap.status).toBe('stub')
-    expect(snap.tools).toHaveLength(1)
-    expect(snap.tools[0].available).toBe(false)
+describe('MCP dock snapshot (via providerTools re-export)', () => {
+  it('reports ready for implemented MCP catalog without live servers', () => {
+    const snap = buildMcpDockSnapshot({
+      catalog: [mcpItem],
+      enabledTools: { 'thirdparty-mcp-dock': true },
+      servers: []
+    })
+    expect(snap.status).toBe('ready')
+    expect(snap.catalogRows[0]?.available).toBe(true)
   })
 
   it('reports empty when no MCP catalog entries', () => {
-    const snap = buildMcpDockSnapshot([remoteModels])
+    const snap = buildMcpDockSnapshot({
+      catalog: [remoteModels],
+      enabledTools: {},
+      servers: []
+    })
     expect(snap.status).toBe('empty')
-    expect(snap.tools).toHaveLength(0)
-  })
-
-  it('reports ready when an MCP tool is implemented', () => {
-    const snap = buildMcpDockSnapshot([{ ...mcpStub, implemented: true }])
-    expect(snap.status).toBe('ready')
-    expect(snap.tools[0].available).toBe(true)
   })
 })

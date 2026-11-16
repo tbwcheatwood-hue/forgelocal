@@ -3,6 +3,7 @@ import { join } from 'path'
 import { CatalogService } from './services/catalog'
 import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
+import { McpService } from './services/mcp'
 import { SettingsService } from './services/settings'
 import { resolveAppIcon } from './iconPath'
 import { registerIpc } from './ipc/register'
@@ -16,6 +17,7 @@ const fileService = new FilesystemService()
 const settingsService = new SettingsService()
 const lmService = new LmStudioService()
 const catalogService = new CatalogService()
+const mcpService = new McpService()
 
 function createWindow(): void {
   const settings = settingsService.getSettings()
@@ -128,7 +130,8 @@ app.whenReady().then(() => {
     fs: fileService,
     settings: settingsService,
     lm: lmService,
-    catalog: catalogService
+    catalog: catalogService,
+    mcp: mcpService
   })
   buildMenu()
   createWindow()
