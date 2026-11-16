@@ -39,6 +39,7 @@ interface AppState {
   showSettings: boolean
   showCanvas: boolean
   showSearch: boolean
+  showMcpPanel: boolean
   searchQuery: string
   terminalLog: string
   pendingCommand: PendingCommand | null
@@ -80,7 +81,14 @@ interface AppState {
   approveCommand: () => Promise<void>
   rejectCommand: () => void
   setShow: (
-    key: 'showAi' | 'showTerminal' | 'showCatalog' | 'showSettings' | 'showCanvas' | 'showSearch',
+    key:
+      | 'showAi'
+      | 'showTerminal'
+      | 'showCatalog'
+      | 'showSettings'
+      | 'showCanvas'
+      | 'showSearch'
+      | 'showMcpPanel',
     value: boolean
   ) => void
   setCatalogFilters: (query: string, category: string) => void
@@ -90,6 +98,8 @@ interface AppState {
   setSelectionText: (text: string) => void
   setGhostIndex: (index: number) => void
   setCanvasFocusPath: (path: string | null) => void
+  popoutIde: () => Promise<void>
+  applyPopoutBootstrap: () => Promise<void>
 }
 
 function emptySession(workspacePath?: string): ChatSession {
@@ -123,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   showSettings: false,
   showCanvas: false,
   showSearch: false,
+  showMcpPanel: false,
   searchQuery: '',
   terminalLog: '',
   pendingCommand: null,
@@ -278,6 +289,41 @@ export const useAppStore = create<AppState>((set, get) => ({
       provider: { ...get().settings.provider, model }
     })
     set({ settings })
+  },
+
+  popoutIde: async () => {
+    try {
+      const state = get()
+      await window.forge.popoutIde({
+        workspaceRoot: state.workspaceRoot,
+        openFilePaths: state.openFiles.map((f) => f.path),
+        activePath: state.activePath,
+        selectedContext: [...state.selectedContext]
+      })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  applyPopoutBootstrap: async () => {
+    try {
+      const boot = await window.forge.getPopoutBootstrap()
+      if (!boot?.workspaceRoot) return
+      await get().openProject(boot.workspaceRoot)
+      for (const path of boot.openFilePaths) {
+        try {
+          await get().openFile(path)
+        } catch {
+          // skip missing files
+        }
+      }
+      if (boot.activePath) get().setActive(boot.activePath)
+      if (boot.selectedContext.length) {
+        set({ selectedContext: boot.selectedContext })
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
   },
 
   sendPrompt: async (prompt: string) => {
@@ -568,3 +614,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGhostIndex: (index) => set({ ghostIndex: index }),
   setCanvasFocusPath: (path) => set({ canvasFocusPath: path })
 }))
+
+export function isPopoutWindow(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('popout') === '1'
+}

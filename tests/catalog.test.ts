@@ -27,6 +27,12 @@ describe('offline tools catalog', () => {
     const builtin = catalog.get('builtin-lmstudio')
     expect(builtin?.implemented).toBe(true)
     expect(builtin?.trust).toBe('built-in')
+    const online = catalog.get('optional-online-extensions')
+    expect(online?.requiresRemote).toBe(true)
+    expect(online?.implemented).toBe(true)
+    const remote = catalog.get('thirdparty-remote-models')
+    expect(remote?.implemented).toBe(true)
+    expect(remote?.requiresRemote).toBe(false)
   })
 
   it('reloads the offline catalog without network', () => {

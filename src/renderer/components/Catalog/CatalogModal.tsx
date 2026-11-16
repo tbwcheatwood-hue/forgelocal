@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { canUseOnlineTools, catalogItemRequiresRemote } from '@shared/providerTools'
 
 const CATEGORIES = [
   'all',
@@ -23,20 +24,25 @@ export function CatalogModal() {
   const selectCatalog = useAppStore((s) => s.selectCatalog)
   const settings = useAppStore((s) => s.settings)
   const setToolEnabled = useAppStore((s) => s.setToolEnabled)
+  const setError = useAppStore((s) => s.setError)
+  const onlineOk = canUseOnlineTools(settings)
 
   const filtered = useMemo(() => {
     const q = catalogQuery.trim().toLowerCase()
     return catalog.filter((item) => {
       if (catalogCategory !== 'all' && item.category !== catalogCategory) return false
+      if (!onlineOk && catalogItemRequiresRemote(item)) return false
       if (!q) return true
       return [item.name, item.description, item.source, ...item.tags]
         .join(' ')
         .toLowerCase()
         .includes(q)
     })
-  }, [catalog, catalogQuery, catalogCategory])
+  }, [catalog, catalogQuery, catalogCategory, onlineOk])
 
   const selected = catalog.find((c) => c.id === selectedCatalogId) ?? filtered[0]
+  const selectedNeedsRemote = selected ? catalogItemRequiresRemote(selected) : false
+  const canEnableSelected = Boolean(selected?.implemented) && (!selectedNeedsRemote || onlineOk)
 
   if (!show) return null
 
@@ -58,6 +64,7 @@ export function CatalogModal() {
             <strong>Tools & Extensions</strong>
             <div style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 4 }}>
               Offline catalog · enable only what this build implements
+              {!onlineOk && ' · online/cloud tools hidden until a remote model is active'}
             </div>
           </div>
           <button className="btn ghost" onClick={() => setShow('showCatalog', false)}>
@@ -128,11 +135,21 @@ export function CatalogModal() {
                   <p>
                     <strong>Install / config:</strong> {selected.installGuidance}
                   </p>
+                  {selectedNeedsRemote && !onlineOk && (
+                    <div className="error-state" style={{ marginTop: 10 }}>
+                      Requires an active remote cloud model. Switch Provider mode to Remote and
+                      select a model first.
+                    </div>
+                  )}
                   <div className="diff-actions">
                     <button
                       className="btn primary"
-                      disabled={!selected.implemented}
-                      onClick={() => setToolEnabled(selected.id, true)}
+                      disabled={!canEnableSelected}
+                      onClick={() => {
+                        void setToolEnabled(selected.id, true).catch((err: unknown) => {
+                          setError(err instanceof Error ? err.message : String(err))
+                        })
+                      }}
                     >
                       Enable
                     </button>
@@ -142,11 +159,13 @@ export function CatalogModal() {
                   </div>
                   <div style={{ marginTop: 8, color: 'var(--text-dim)', fontSize: 12 }}>
                     Current:{' '}
-                    {selected.implemented
-                      ? settings.enabledTools[selected.id]
-                        ? 'enabled'
-                        : 'disabled'
-                      : 'unavailable (not implemented)'}
+                    {!selected.implemented
+                      ? 'unavailable (not implemented)'
+                      : selectedNeedsRemote && !onlineOk
+                        ? 'unavailable (remote model required)'
+                        : settings.enabledTools[selected.id]
+                          ? 'enabled'
+                          : 'disabled'}
                   </div>
                 </div>
               ) : (

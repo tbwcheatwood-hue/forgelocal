@@ -1,5 +1,6 @@
 {
   "provider": {
+    "mode": "local",
     "baseUrl": "http://localhost:1234/v1",
     "apiKey": "lm-studio",
     "model": "",

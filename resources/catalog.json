@@ -146,25 +146,39 @@
   {
     "id": "thirdparty-mcp-dock",
     "name": "MCP Tool Dock (Preview)",
-    "description": "UI shell for Model Context Protocol tool cards. Does not execute arbitrary remote MCP servers yet.",
+    "description": "Honest MCP tool cards in the dock. Lists catalog MCP entries; does not run a live MCP server runtime yet.",
     "category": "ai-tools",
     "tags": ["mcp", "preview", "third-party"],
     "trust": "third-party",
     "source": "bundled-stub",
     "implemented": false,
     "enabledByDefault": false,
-    "installGuidance": "Not executable in this build. Catalog entry reserved for a future MCP bridge. Do not treat as installed."
+    "installGuidance": "Open the MCP chip in the tool dock for status. Not executable in this build — no silent remote MCP bridge."
   },
   {
     "id": "thirdparty-remote-models",
     "name": "Remote Cloud Models",
-    "description": "Placeholder for optional cloud providers. Intentionally not wired — ForgeLocal never silently falls back to remote APIs.",
+    "description": "Opt-in OpenAI-compatible remote endpoint (base URL + API key) via Settings. Never used as a silent fallback from local mode.",
     "category": "ai-tools",
-    "tags": ["cloud", "remote", "disabled"],
+    "tags": ["cloud", "remote"],
     "trust": "third-party",
-    "source": "not-bundled",
-    "implemented": false,
+    "source": "settings",
+    "implemented": true,
     "enabledByDefault": false,
-    "installGuidance": "Not available. Core functionality is local LM Studio only. No silent remote fallback."
+    "requiresRemote": false,
+    "installGuidance": "Settings → Provider mode → Remote. Enter base URL and API key (stored locally, never logged). Select a discovered model to chat."
+  },
+  {
+    "id": "optional-online-extensions",
+    "name": "Online tools & extensions",
+    "description": "Allow enabling online/cloud catalog tools. Only available while a remote cloud model is active.",
+    "category": "ai-tools",
+    "tags": ["online", "extensions", "cloud"],
+    "trust": "optional",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": false,
+    "requiresRemote": true,
+    "installGuidance": "Switch to Remote provider mode, select a model, then Enable. Disabled automatically when you return to local LM Studio."
   }
 ]

@@ -1,7 +1,18 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import { randomUUID } from 'crypto'
+import { join } from 'path'
 import { spawn } from 'child_process'
-import type { AppSettings, ChatCompletionRequest, ProposedEdit } from '../../shared/types'
+import type {
+  AppSettings,
+  ChatCompletionRequest,
+  PopoutBootstrap,
+  ProposedEdit
+} from '../../shared/types'
+import {
+  assertOnlineToolAllowed,
+  disableRemoteOnlyTools,
+  isRemoteMode
+} from '../../shared/providerTools'
 import { CatalogService } from '../services/catalog'
 import { parseProposedEdits } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
@@ -16,14 +27,64 @@ export interface Services {
   catalog: CatalogService
 }
 
+let popoutWindow: BrowserWindow | null = null
+let popoutBootstrap: PopoutBootstrap | null = null
+
+function applySettingsSideEffects(
+  fileService: FilesystemService,
+  settings: SettingsService,
+  catalog: CatalogService,
+  next: AppSettings
+): AppSettings {
+  const sanitized = disableRemoteOnlyTools(next, catalog.list())
+  const finalSettings =
+    sanitized === next ? next : settings.updateSettings({ enabledTools: sanitized.enabledTools })
+  fileService.setAllowOutside(finalSettings.allowPathsOutsideWorkspace)
+  return finalSettings
+}
+
+function createPopoutBrowserWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 800,
+    minHeight: 560,
+    show: false,
+    title: 'ForgeLocal IDE',
+    backgroundColor: '#0f1419',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+
+  win.on('ready-to-show', () => win.show())
+  win.on('closed', () => {
+    if (popoutWindow === win) popoutWindow = null
+  })
+
+  const isDev = !app.isPackaged
+  if (isDev && process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    url.searchParams.set('popout', '1')
+    void win.loadURL(url.toString())
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'), {
+      query: { popout: '1' }
+    })
+  }
+  return win
+}
+
 export function registerIpc(services: Services): void {
   const { fs: fileService, settings, lm, catalog } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
   ipcMain.handle('settings:update', (_e, partial: Partial<AppSettings>) => {
     const next = settings.updateSettings(partial)
-    fileService.setAllowOutside(next.allowPathsOutsideWorkspace)
-    return next
+    return applySettingsSideEffects(fileService, settings, catalog, next)
   })
 
   ipcMain.handle('workspace:open', async (_e, dirPath?: string) => {
@@ -82,7 +143,9 @@ export function registerIpc(services: Services): void {
     ) => {
       const provider = settings.getSettings().provider
       const systemParts = [
-        'You are ForgeLocal, a local coding assistant.',
+        isRemoteMode(provider)
+          ? 'You are ForgeLocal, a coding assistant using a user-configured remote OpenAI-compatible model.'
+          : 'You are ForgeLocal, a local coding assistant.',
         'Only use the files the user explicitly attached as context.',
         'When proposing file edits, use fenced code blocks headed with: // file: relative/path',
         'Do not claim to have written files; the user must accept diffs.'
@@ -145,10 +208,25 @@ export function registerIpc(services: Services): void {
       )
     }
     const current = settings.getSettings()
-    return settings.updateSettings({
+    if (enabled) assertOnlineToolAllowed(current, item)
+    const next = settings.updateSettings({
       enabledTools: { ...current.enabledTools, [id]: enabled }
     })
+    return applySettingsSideEffects(fileService, settings, catalog, next)
   })
+
+  ipcMain.handle('window:popoutIde', (_e, state: PopoutBootstrap) => {
+    popoutBootstrap = state
+    if (popoutWindow && !popoutWindow.isDestroyed()) {
+      popoutWindow.focus()
+      popoutWindow.webContents.send('window:popout-refresh', state)
+      return { ok: true as const, reused: true }
+    }
+    popoutWindow = createPopoutBrowserWindow()
+    return { ok: true as const, reused: false }
+  })
+
+  ipcMain.handle('window:getPopoutBootstrap', () => popoutBootstrap)
 
   ipcMain.handle('chat:sessions', () => settings.getChatSessions())
   ipcMain.handle('chat:save', (_e, session) => settings.saveChatSession(session))

@@ -5,6 +5,7 @@ import type {
   ProviderSettings,
   StreamChunk
 } from '../../shared/types'
+import { isRemoteMode } from '../../shared/providerTools'
 import { redactSecrets } from './security'
 
 export class LmStudioService {
@@ -12,7 +13,31 @@ export class LmStudioService {
 
   async testConnection(provider: ProviderSettings): Promise<LmConnectionResult> {
     const baseUrl = provider.baseUrl.replace(/\/$/, '')
+    const remote = isRemoteMode(provider)
+    const label = remote ? 'remote OpenAI-compatible API' : 'LM Studio'
     const started = Date.now()
+
+    if (remote && !provider.apiKey.trim()) {
+      return {
+        status: 'error',
+        message:
+          'Remote mode needs an API key in Settings. Keys stay on this machine and are never logged.',
+        models: [],
+        baseUrl
+      }
+    }
+
+    if (!baseUrl) {
+      return {
+        status: 'error',
+        message: remote
+          ? 'Remote base URL is empty. Set an OpenAI-compatible endpoint in Settings.'
+          : 'LM Studio base URL is empty.',
+        models: [],
+        baseUrl
+      }
+    }
+
     try {
       const modelsUrl = `${baseUrl}/models`
       const controller = new AbortController()
@@ -31,7 +56,7 @@ export class LmStudioService {
       if (!res.ok) {
         return {
           status: 'error',
-          message: `LM Studio responded with HTTP ${res.status}. Is the local server running?`,
+          message: `${label} responded with HTTP ${res.status}. Check base URL and credentials.`,
           models: [],
           baseUrl,
           latencyMs
@@ -43,8 +68,9 @@ export class LmStudioService {
       if (models.length === 0) {
         return {
           status: 'no-model',
-          message:
-            'Connected to LM Studio, but no models are loaded. Load a model in LM Studio and try again.',
+          message: remote
+            ? 'Connected to the remote API, but no models were listed for this key/endpoint.'
+            : 'Connected to LM Studio, but no models are loaded. Load a model in LM Studio and try again.',
           models: [],
           baseUrl,
           latencyMs
@@ -52,7 +78,7 @@ export class LmStudioService {
       }
       return {
         status: 'connected',
-        message: `Connected. ${models.length} model(s) available.`,
+        message: `Connected (${remote ? 'remote' : 'local'}). ${models.length} model(s) available.`,
         models,
         baseUrl,
         latencyMs
@@ -63,8 +89,9 @@ export class LmStudioService {
       if (lowered.includes('abort')) {
         return {
           status: 'unreachable',
-          message:
-            'Timed out reaching LM Studio. Check that the server is started (Developer → Start Server).',
+          message: remote
+            ? 'Timed out reaching the remote API. Check the base URL, network, and firewall.'
+            : 'Timed out reaching LM Studio. Check that the server is started (Developer → Start Server).',
           models: [],
           baseUrl
         }
@@ -76,8 +103,9 @@ export class LmStudioService {
       ) {
         return {
           status: 'stopped',
-          message:
-            'Cannot reach LM Studio at this URL. Start LM Studio, load a model, and enable the local server on the configured port.',
+          message: remote
+            ? 'Cannot reach the remote OpenAI-compatible endpoint. Verify base URL and network access.'
+            : 'Cannot reach LM Studio at this URL. Start LM Studio, load a model, and enable the local server on the configured port.',
           models: [],
           baseUrl
         }
@@ -103,10 +131,21 @@ export class LmStudioService {
     onChunk: (chunk: StreamChunk) => void
   ): Promise<void> {
     const baseUrl = provider.baseUrl.replace(/\/$/, '')
+    const remote = isRemoteMode(provider)
     if (!provider.model && !request.model) {
       onChunk({
         type: 'error',
-        error: 'No model selected. Choose a model from the LM Studio list.'
+        error: remote
+          ? 'No model selected. Choose a remote model from the list after connecting.'
+          : 'No model selected. Choose a model from the LM Studio list.'
+      })
+      return
+    }
+
+    if (remote && !provider.apiKey.trim()) {
+      onChunk({
+        type: 'error',
+        error: 'Remote mode requires an API key in Settings before chatting.'
       })
       return
     }
@@ -138,7 +177,7 @@ export class LmStudioService {
         onChunk({
           type: 'error',
           error: redactSecrets(
-            `LM Studio API error HTTP ${res.status}: ${text.slice(0, 400) || res.statusText}`
+            `${remote ? 'Remote API' : 'LM Studio'} error HTTP ${res.status}: ${text.slice(0, 400) || res.statusText}`
           )
         })
         return
@@ -154,7 +193,7 @@ export class LmStudioService {
         if (!content) {
           onChunk({
             type: 'error',
-            error: 'Empty or malformed response from LM Studio.'
+            error: `Empty or malformed response from ${remote ? 'remote API' : 'LM Studio'}.`
           })
           return
         }

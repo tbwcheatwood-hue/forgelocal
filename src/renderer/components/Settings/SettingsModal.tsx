@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { DEFAULT_PROVIDER, DEFAULT_REMOTE_PROVIDER } from '@shared/types'
+import type { ProviderMode } from '@shared/types'
+import { isRemoteMode } from '@shared/providerTools'
 
 export function SettingsModal() {
   const show = useAppStore((s) => s.showSettings)
@@ -8,6 +11,7 @@ export function SettingsModal() {
   const updateSettings = useAppStore((s) => s.updateSettings)
   const refreshLm = useAppStore((s) => s.refreshLm)
   const lmStatus = useAppStore((s) => s.lmStatus)
+  const [mode, setMode] = useState<ProviderMode>(settings.provider.mode ?? 'local')
   const [baseUrl, setBaseUrl] = useState(settings.provider.baseUrl)
   const [apiKey, setApiKey] = useState(settings.provider.apiKey)
   const [timeoutMs, setTimeoutMs] = useState(String(settings.provider.timeoutMs))
@@ -16,6 +20,19 @@ export function SettingsModal() {
   const [allowOutside, setAllowOutside] = useState(settings.allowPathsOutsideWorkspace)
 
   if (!show) return null
+
+  const remote = mode === 'remote'
+
+  const switchMode = (next: ProviderMode) => {
+    setMode(next)
+    if (next === 'remote' && !isRemoteMode(settings.provider)) {
+      setBaseUrl(DEFAULT_REMOTE_PROVIDER.baseUrl)
+      setApiKey('')
+    } else if (next === 'local' && isRemoteMode(settings.provider)) {
+      setBaseUrl(DEFAULT_PROVIDER.baseUrl)
+      setApiKey(DEFAULT_PROVIDER.apiKey)
+    }
+  }
 
   return (
     <div className="modal-backdrop" onClick={() => setShow('showSettings', false)}>
@@ -34,13 +51,41 @@ export function SettingsModal() {
           </button>
         </div>
         <div className="modal-body settings-grid">
+          <fieldset className="provider-mode">
+            <legend>Provider mode</legend>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="provider-mode"
+                checked={mode === 'local'}
+                onChange={() => switchMode('local')}
+              />
+              Local (LM Studio)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="radio"
+                name="provider-mode"
+                checked={mode === 'remote'}
+                onChange={() => switchMode('remote')}
+              />
+              Remote (OpenAI-compatible)
+            </label>
+          </fieldset>
           <label>
-            LM Studio base URL
+            {remote ? 'Remote API base URL' : 'LM Studio base URL'}
             <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
           </label>
           <label>
-            API key (local placeholder; not a cloud secret)
-            <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+            {remote
+              ? 'API key (stored locally; never logged)'
+              : 'API key (local placeholder; not a cloud secret)'}
+            <input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              type={remote ? 'password' : 'text'}
+              autoComplete="off"
+            />
           </label>
           <label>
             Timeout (ms)
@@ -67,8 +112,20 @@ export function SettingsModal() {
             {lmStatus?.message ?? 'Not tested'}
           </div>
           <div style={{ color: 'var(--text-dim)', fontSize: 12, lineHeight: 1.45 }}>
-            Troubleshooting: ensure LM Studio is running, a model is loaded, and Local Server is
-            started on the configured port. ForgeLocal never falls back to remote providers.
+            {remote ? (
+              <>
+                Remote mode uses your base URL + API key against an OpenAI-compatible{' '}
+                <code>/models</code> and <code>/chat/completions</code> API. ForgeLocal does not
+                invent credentials. Online tools/extensions unlock only after a remote model is
+                selected. Switching back to Local disables those tools automatically.
+              </>
+            ) : (
+              <>
+                Troubleshooting: ensure LM Studio is running, a model is loaded, and Local Server is
+                started on the configured port. Local mode never silently falls back to a remote
+                provider.
+              </>
+            )}
           </div>
         </div>
         <div className="modal-footer">
@@ -83,10 +140,17 @@ export function SettingsModal() {
                 allowPathsOutsideWorkspace: allowOutside,
                 provider: {
                   ...settings.provider,
-                  baseUrl: baseUrl.trim() || 'http://localhost:1234/v1',
+                  mode,
+                  baseUrl:
+                    baseUrl.trim() ||
+                    (mode === 'remote'
+                      ? DEFAULT_REMOTE_PROVIDER.baseUrl
+                      : DEFAULT_PROVIDER.baseUrl),
                   apiKey,
                   timeoutMs: Number(timeoutMs) || 120000,
-                  stream
+                  stream,
+                  // Clear model when switching mode so the user picks from the new endpoint
+                  model: mode === settings.provider.mode ? settings.provider.model : ''
                 }
               })
               setShow('showSettings', false)

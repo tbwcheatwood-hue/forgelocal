@@ -7,6 +7,7 @@ import type {
   FileNode,
   LmConnectionResult,
   LmModel,
+  PopoutBootstrap,
   ProposedEdit,
   SearchResult,
   StreamChunk
@@ -61,6 +62,9 @@ export interface ForgeApi {
   confirm: (message: string, detail?: string) => Promise<boolean>
   openExternal: (url: string) => Promise<void>
   newId: () => Promise<string>
+  popoutIde: (state: PopoutBootstrap) => Promise<{ ok: true; reused: boolean }>
+  getPopoutBootstrap: () => Promise<PopoutBootstrap | null>
+  onPopoutRefresh: (cb: (state: PopoutBootstrap) => void) => () => void
   onMenu: (channel: string, cb: () => void) => () => void
 }
 
@@ -108,6 +112,13 @@ const api: ForgeApi = {
   confirm: (message, detail) => ipcRenderer.invoke('dialog:confirm', message, detail),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   newId: () => ipcRenderer.invoke('util:id'),
+  popoutIde: (state) => ipcRenderer.invoke('window:popoutIde', state),
+  getPopoutBootstrap: () => ipcRenderer.invoke('window:getPopoutBootstrap'),
+  onPopoutRefresh: (cb) => {
+    const listener = (_: Electron.IpcRendererEvent, state: PopoutBootstrap) => cb(state)
+    ipcRenderer.on('window:popout-refresh', listener)
+    return () => ipcRenderer.removeListener('window:popout-refresh', listener)
+  },
   onMenu: (channel, cb) => {
     const map: Record<string, string> = {
       'open-project': 'menu:open-project',

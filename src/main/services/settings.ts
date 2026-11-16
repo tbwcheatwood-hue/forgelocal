@@ -24,13 +24,17 @@ export class SettingsService {
 
   getSettings(): AppSettings {
     const settings = this.store.get('settings')
+    const provider = {
+      ...DEFAULT_SETTINGS.provider,
+      ...(settings.provider ?? {})
+    }
+    if (provider.mode !== 'local' && provider.mode !== 'remote') {
+      provider.mode = 'local'
+    }
     return {
       ...structuredClone(DEFAULT_SETTINGS),
       ...settings,
-      provider: {
-        ...DEFAULT_SETTINGS.provider,
-        ...(settings.provider ?? {})
-      }
+      provider
     }
   }
 

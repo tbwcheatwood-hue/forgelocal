@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { DiffReview } from '../DiffReview/DiffReview'
+import { isRemoteMode } from '@shared/providerTools'
 
 export function ChatPanel() {
   const [prompt, setPrompt] = useState('')
@@ -24,12 +25,17 @@ export function ChatPanel() {
   )
 
   const disconnected = !lmStatus || lmStatus.status !== 'connected'
+  const remote = isRemoteMode(settings.provider)
 
   return (
     <div className="panel ai-panel">
       <div className="panel-header">
         <span>Assistant</span>
-        <button className="btn ghost" onClick={() => refreshLm()} title="Test LM Studio connection">
+        <button
+          className="btn ghost"
+          onClick={() => refreshLm()}
+          title={remote ? 'Test remote API connection' : 'Test LM Studio connection'}
+        >
           Refresh
         </button>
       </div>
@@ -37,10 +43,13 @@ export function ChatPanel() {
       <div className="chat-toolbar">
         <div className="status-line" title={lmStatus?.message}>
           <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
-          <span>{lmStatus?.message ?? 'LM Studio status unknown'}</span>
+          <span>
+            {lmStatus?.message ??
+              (remote ? 'Remote API status unknown' : 'LM Studio status unknown')}
+          </span>
         </div>
         <label>
-          Model
+          Model ({remote ? 'remote' : 'local'})
           <select
             value={settings.provider.model}
             onChange={(e) => selectModel(e.target.value)}
@@ -61,8 +70,8 @@ export function ChatPanel() {
           <div className="chat-empty">
             <h3>Ask with intent</h3>
             <p>
-              Attach only the files you choose, then prompt your local model. Proposed edits arrive
-              as reviewable diffs — never silent overwrites.
+              Attach only the files you choose, then prompt your {remote ? 'remote' : 'local'}{' '}
+              model. Proposed edits arrive as reviewable diffs — never silent overwrites.
             </p>
           </div>
         )}
@@ -105,7 +114,7 @@ export function ChatPanel() {
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ask your local model…"
+          placeholder={remote ? 'Ask your remote model…' : 'Ask your local model…'}
           aria-label="Prompt"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -119,7 +128,9 @@ export function ChatPanel() {
         >
           {disconnected ? (
             <span className="composer-hint warn">
-              Connect LM Studio to send · localhost:1234/v1
+              {remote
+                ? 'Connect remote API in Settings (base URL + API key)'
+                : 'Connect LM Studio to send · localhost:1234/v1'}
             </span>
           ) : (
             <span className="composer-hint">Ctrl/⌘ + Enter to send</span>

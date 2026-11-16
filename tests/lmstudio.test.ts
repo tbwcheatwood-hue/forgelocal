@@ -3,6 +3,7 @@ import { LmStudioService } from '../src/main/services/lmstudio'
 import type { ProviderSettings } from '../src/shared/types'
 
 const provider: ProviderSettings = {
+  mode: 'local',
   baseUrl: 'http://localhost:1234/v1',
   apiKey: 'lm-studio',
   model: 'test-model',
@@ -93,6 +94,38 @@ describe('LM Studio connection and model handling', () => {
     )
     expect(chunks[0]?.type).toBe('error')
     expect(chunks[0]?.error?.toLowerCase()).toContain('no model')
+  })
+
+  it('requires an API key in remote mode before listing models', async () => {
+    const lm = new LmStudioService()
+    const result = await lm.testConnection({
+      ...provider,
+      mode: 'remote',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: '',
+      model: ''
+    })
+    expect(result.status).toBe('error')
+    expect(result.message.toLowerCase()).toContain('api key')
+  })
+
+  it('uses remote messaging when connecting to a remote endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('fetch failed: ECONNREFUSED')
+      })
+    )
+    const lm = new LmStudioService()
+    const result = await lm.testConnection({
+      ...provider,
+      mode: 'remote',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-test'
+    })
+    expect(['stopped', 'unreachable']).toContain(result.status)
+    expect(result.message.toLowerCase()).toMatch(/remote/)
+    expect(result.message.toLowerCase()).not.toContain('lm studio')
   })
 
   it('supports cancellation via abort controller', async () => {

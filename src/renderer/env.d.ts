@@ -6,6 +6,7 @@ import type {
   FileNode,
   LmConnectionResult,
   LmModel,
+  PopoutBootstrap,
   ProposedEdit,
   SearchResult,
   StreamChunk
@@ -60,6 +61,9 @@ export interface ForgeApi {
   confirm: (message: string, detail?: string) => Promise<boolean>
   openExternal: (url: string) => Promise<void>
   newId: () => Promise<string>
+  popoutIde: (state: PopoutBootstrap) => Promise<{ ok: true; reused: boolean }>
+  getPopoutBootstrap: () => Promise<PopoutBootstrap | null>
+  onPopoutRefresh: (cb: (state: PopoutBootstrap) => void) => () => void
   onMenu: (channel: string, cb: () => void) => () => void
 }
 

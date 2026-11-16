@@ -14,6 +14,8 @@ export interface CatalogItem {
   implemented: boolean
   enabledByDefault: boolean
   installGuidance: string
+  /** When true, enable/use only if a remote cloud model is active. */
+  requiresRemote?: boolean
   configSchema?: Record<string, unknown>
 }
 
@@ -24,12 +26,23 @@ export interface CatalogFilter {
   implementedOnly?: boolean
 }
 
+export type ProviderMode = 'local' | 'remote'
+
 export interface ProviderSettings {
+  /** local = LM Studio; remote = user-provided OpenAI-compatible endpoint */
+  mode: ProviderMode
   baseUrl: string
   apiKey: string
   model: string
   timeoutMs: number
   stream: boolean
+}
+
+export interface PopoutBootstrap {
+  workspaceRoot: string | null
+  openFilePaths: string[]
+  activePath: string | null
+  selectedContext: string[]
 }
 
 export interface AppSettings {
@@ -141,8 +154,18 @@ export interface SearchResult {
 }
 
 export const DEFAULT_PROVIDER: ProviderSettings = {
+  mode: 'local',
   baseUrl: 'http://localhost:1234/v1',
   apiKey: 'lm-studio',
+  model: '',
+  timeoutMs: 120000,
+  stream: true
+}
+
+export const DEFAULT_REMOTE_PROVIDER: ProviderSettings = {
+  mode: 'remote',
+  baseUrl: 'https://api.openai.com/v1',
+  apiKey: '',
   model: '',
   timeoutMs: 120000,
   stream: true
