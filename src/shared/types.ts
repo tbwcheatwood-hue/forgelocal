@@ -1,4 +1,5 @@
 import { DEFAULT_AGENT_TEAM, type AgentTeamSettings } from './agents'
+import { DEFAULT_COMPANION_BRIDGE, type CompanionBridgeSettings } from './companion'
 import type { McpServerConfig } from './mcp'
 
 export type TrustStatus = 'built-in' | 'optional' | 'third-party'
@@ -76,6 +77,10 @@ export interface AppSettings {
   mcpServers: McpServerConfig[]
   /** Cooperative multi-agent team (LocalAGI-inspired). Explicit opt-in. */
   agentTeam: AgentTeamSettings
+  /** Optional LocalForge Companion bridge (pairing / health). Explicit opt-in. */
+  companion: CompanionBridgeSettings
+  /** Relative preview root inside the workspace (Companion-style static preview). */
+  previewDir: string
 }
 
 export interface FileNode {
@@ -222,5 +227,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   toolConfigs: {},
   allowPathsOutsideWorkspace: false,
   mcpServers: [],
-  agentTeam: structuredClone(DEFAULT_AGENT_TEAM)
+  agentTeam: structuredClone(DEFAULT_AGENT_TEAM),
+  companion: structuredClone(DEFAULT_COMPANION_BRIDGE),
+  previewDir: '.'
 }

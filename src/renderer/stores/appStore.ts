@@ -1,5 +1,12 @@
 import { create } from 'zustand'
 import { canRunMultiAgent, normalizeAgentTeam, type AgentRole } from '@shared/agents'
+import type {
+  CompanionHealth,
+  CompanionPairResult,
+  DiscoveredProvider,
+  GitSnapshot,
+  HardwareInventory
+} from '@shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
 import type {
   AppSettings,
@@ -49,6 +56,8 @@ interface AppState {
   showSearch: boolean
   showMcpPanel: boolean
   showAgentsPanel: boolean
+  showCompanionPanel: boolean
+  showPreview: boolean
   searchQuery: string
   terminalLog: string
   pendingCommand: PendingCommand | null
@@ -67,6 +76,12 @@ interface AppState {
   mcpLoading: boolean
   mcpProbes: Record<string, McpServerProbeResult>
   activeAgentName: string | null
+  companionHealth: CompanionHealth | null
+  hardware: HardwareInventory | null
+  discoveredProviders: DiscoveredProvider[]
+  gitSnapshot: GitSnapshot | null
+  previewUrl: string | null
+  previewRoot: string | null
 
   bootstrap: () => Promise<void>
   openProject: (path?: string) => Promise<void>
@@ -105,7 +120,9 @@ interface AppState {
       | 'showCanvas'
       | 'showSearch'
       | 'showMcpPanel'
-      | 'showAgentsPanel',
+      | 'showAgentsPanel'
+      | 'showCompanionPanel'
+      | 'showPreview',
     value: boolean
   ) => void
   setCatalogFilters: (query: string, category: string) => void
@@ -119,6 +136,15 @@ interface AppState {
   upsertMcpServer: (input: Partial<McpServerConfig>) => Promise<void>
   removeMcpServer: (id: string) => Promise<void>
   refreshMcpTools: (serverId?: string) => Promise<void>
+  refreshCompanion: () => Promise<void>
+  pairCompanion: (code: string) => Promise<CompanionPairResult>
+  disconnectCompanion: () => Promise<void>
+  refreshHardware: () => Promise<void>
+  discoverLocalProviders: () => Promise<void>
+  applyDiscoveredProvider: (provider: DiscoveredProvider) => Promise<void>
+  refreshGit: () => Promise<void>
+  startPreview: (previewDir?: string) => Promise<void>
+  stopPreview: () => Promise<void>
 }
 
 function emptySession(workspacePath?: string): ChatSession {
@@ -159,6 +185,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   showSearch: false,
   showMcpPanel: false,
   showAgentsPanel: false,
+  showCompanionPanel: false,
+  showPreview: false,
   searchQuery: '',
   terminalLog: '',
   pendingCommand: null,
@@ -172,6 +200,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectionText: '',
   syntaxDimming: false,
   activeAgentName: null,
+  companionHealth: null,
+  hardware: null,
+  discoveredProviders: [],
+  gitSnapshot: null,
+  previewUrl: null,
+  previewRoot: null,
   ghostIndex: 0,
   canvasFocusPath: null,
   mcpQuery: '',
@@ -709,7 +743,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       terminalLog: get().terminalLog + `\n$ ${pending.command}\n`
     })
-    const result = await window.forge.runApprovedCommand({ command: pending.command })
+    const result = await window.forge.runApprovedCommand({
+      command: pending.command,
+      confirm: true
+    })
     if (!result.ok) {
       set({
         terminalLog: get().terminalLog + `(blocked/error) ${result.error ?? 'failed'}\n`,
@@ -757,6 +794,94 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) })
     }
+  },
+
+  refreshCompanion: async () => {
+    try {
+      const health = await window.forge.companionHealth()
+      set({ companionHealth: health, error: health.reachable ? null : health.message })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  pairCompanion: async (code) => {
+    const result = await window.forge.companionPair(code)
+    if (result.ok) {
+      const settings = await window.forge.getSettings()
+      set({ settings, error: null })
+      await get().refreshCompanion()
+    }
+    return result
+  },
+
+  disconnectCompanion: async () => {
+    const settings = await window.forge.companionDisconnect()
+    set({ settings, companionHealth: null, error: null })
+  },
+
+  refreshHardware: async () => {
+    try {
+      const hardware = await window.forge.hardwareInventory()
+      set({ hardware })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  discoverLocalProviders: async () => {
+    try {
+      const discoveredProviders = await window.forge.discoverProviders()
+      set({ discoveredProviders, error: null })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  applyDiscoveredProvider: async (provider) => {
+    if (!provider.reachable || !provider.baseUrl) return
+    const isOllama = provider.kind === 'ollama'
+    const model = provider.models[0]?.id ?? ''
+    const settings = await window.forge.updateSettings({
+      provider: {
+        ...get().settings.provider,
+        mode: 'local',
+        baseUrl: isOllama ? `${provider.baseUrl.replace(/\/+$/, '')}/v1` : provider.baseUrl,
+        model,
+        apiKey: get().settings.provider.apiKey
+      }
+    })
+    set({ settings, error: null })
+    await get().refreshLm()
+  },
+
+  refreshGit: async () => {
+    try {
+      const gitSnapshot = await window.forge.gitSnapshot()
+      set({ gitSnapshot })
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+    }
+  },
+
+  startPreview: async (previewDir) => {
+    const result = await window.forge.previewStart(previewDir)
+    if (!result.ok) {
+      set({ error: result.message, previewUrl: null, previewRoot: null })
+      return
+    }
+    set({
+      previewUrl: result.url,
+      previewRoot: result.root,
+      showPreview: true,
+      error: null,
+      settings: await window.forge.getSettings()
+    })
+  },
+
+  stopPreview: async () => {
+    await window.forge.previewStop()
+    set({ previewUrl: null, previewRoot: null })
   },
 
   refreshMcpTools: async (serverId) => {

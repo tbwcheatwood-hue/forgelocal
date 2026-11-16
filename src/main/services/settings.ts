@@ -1,5 +1,6 @@
 import Store from 'electron-store'
 import { normalizeAgentTeam } from '../../shared/agents'
+import { normalizeCompanionBridge } from '../../shared/companion'
 import type { AppSettings, ChatSession, ProviderSettings } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import { truncateChatSessionForStorage } from '../../shared/messageLimits'
@@ -68,7 +69,12 @@ export class SettingsService {
       mcpServers: Array.isArray(settings.mcpServers)
         ? settings.mcpServers
         : structuredClone(DEFAULT_SETTINGS.mcpServers),
-      agentTeam: normalizeAgentTeam(settings.agentTeam ?? DEFAULT_SETTINGS.agentTeam)
+      agentTeam: normalizeAgentTeam(settings.agentTeam ?? DEFAULT_SETTINGS.agentTeam),
+      companion: normalizeCompanionBridge(settings.companion ?? DEFAULT_SETTINGS.companion),
+      previewDir:
+        typeof settings.previewDir === 'string' && settings.previewDir.trim()
+          ? settings.previewDir.trim().slice(0, 260)
+          : DEFAULT_SETTINGS.previewDir
     }
   }
 
@@ -88,7 +94,17 @@ export class SettingsService {
       },
       mcpServers: Array.isArray(partial.mcpServers) ? partial.mcpServers : current.mcpServers,
       agentTeam:
-        partial.agentTeam !== undefined ? normalizeAgentTeam(partial.agentTeam) : current.agentTeam
+        partial.agentTeam !== undefined ? normalizeAgentTeam(partial.agentTeam) : current.agentTeam,
+      companion:
+        partial.companion !== undefined
+          ? normalizeCompanionBridge(partial.companion)
+          : current.companion,
+      previewDir:
+        partial.previewDir !== undefined
+          ? String(partial.previewDir || '.')
+              .trim()
+              .slice(0, 260) || '.'
+          : current.previewDir
     }
     this.store.set('settings', next)
     return next

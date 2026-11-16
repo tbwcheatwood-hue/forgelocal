@@ -2,9 +2,11 @@ import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'path'
 import { AgentsService } from './services/agents'
 import { CatalogService } from './services/catalog'
+import { CompanionService } from './services/companion'
 import { FilesystemService } from './services/filesystem'
 import { LmStudioService } from './services/lmstudio'
 import { McpService } from './services/mcp'
+import { PreviewService } from './services/preview'
 import { SettingsService } from './services/settings'
 import { resolveAppIcon } from './iconPath'
 import { registerIpc } from './ipc/register'
@@ -24,6 +26,8 @@ const lmService = new LmStudioService()
 const catalogService = new CatalogService()
 const mcpService = new McpService()
 const agentsService = new AgentsService(lmService)
+const companionService = new CompanionService()
+const previewService = new PreviewService()
 
 function createWindow(): void {
   const settings = settingsService.getSettings()
@@ -138,7 +142,9 @@ app.whenReady().then(() => {
     lm: lmService,
     catalog: catalogService,
     mcp: mcpService,
-    agents: agentsService
+    agents: agentsService,
+    companion: companionService,
+    preview: previewService
   })
   buildMenu()
   createWindow()

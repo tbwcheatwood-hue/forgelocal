@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/appStore'
 import { buildMcpDockSnapshot } from '@shared/mcp'
 import { canUseOnlineTools, isRemoteMode } from '@shared/providerTools'
 import { AgentsPanel } from '../Agents/AgentsPanel'
+import { CompanionPanel } from '../Companion/CompanionPanel'
 import { McpPanel } from './McpPanel'
 
 /** Bottom dock: provider / MCP / online tools / context budget. */
@@ -16,6 +17,9 @@ export function ToolDock() {
   const catalog = useAppStore((s) => s.catalog)
   const showMcpPanel = useAppStore((s) => s.showMcpPanel)
   const showAgentsPanel = useAppStore((s) => s.showAgentsPanel)
+  const showCompanionPanel = useAppStore((s) => s.showCompanionPanel)
+  const companionHealth = useAppStore((s) => s.companionHealth)
+  const gitSnapshot = useAppStore((s) => s.gitSnapshot)
   const mcpProbes = useAppStore((s) => s.mcpProbes)
   const mcpLoading = useAppStore((s) => s.mcpLoading)
   const setShow = useAppStore((s) => s.setShow)
@@ -28,6 +32,18 @@ export function ToolDock() {
     : featureAgents
       ? 'off'
       : 'disabled'
+  const companionMeta = companionHealth?.reachable
+    ? companionHealth.version
+      ? `v${companionHealth.version}`
+      : 'up'
+    : settings.companion?.enabled
+      ? 'down'
+      : 'off'
+  const companionDot = companionHealth?.reachable
+    ? 'connected'
+    : settings.companion?.token
+      ? 'error'
+      : 'unknown'
 
   const mcp = useMemo(
     () =>
@@ -76,7 +92,10 @@ export function ToolDock() {
           className={`dock-chip ${showMcpPanel ? 'active' : ''}`}
           onClick={() => {
             setShow('showMcpPanel', !showMcpPanel)
-            if (!showMcpPanel) setShow('showAgentsPanel', false)
+            if (!showMcpPanel) {
+              setShow('showAgentsPanel', false)
+              setShow('showCompanionPanel', false)
+            }
           }}
           title={mcp.message}
           aria-expanded={showMcpPanel}
@@ -90,7 +109,10 @@ export function ToolDock() {
           className={`dock-chip ${showAgentsPanel ? 'active' : ''} ${team.enabled ? '' : 'muted'}`}
           onClick={() => {
             setShow('showAgentsPanel', !showAgentsPanel)
-            if (!showAgentsPanel) setShow('showMcpPanel', false)
+            if (!showAgentsPanel) {
+              setShow('showMcpPanel', false)
+              setShow('showCompanionPanel', false)
+            }
           }}
           title="LocalAGI-inspired multi-agent team (explicit opt-in)"
           aria-expanded={showAgentsPanel}
@@ -98,6 +120,34 @@ export function ToolDock() {
           <span className={`status-dot ${team.enabled ? 'connected' : 'unknown'}`} />
           <span className="dock-label">Agents</span>
           <span className="dock-meta">{agentMeta}</span>
+        </button>
+
+        <button
+          className={`dock-chip ${showCompanionPanel ? 'active' : ''}`}
+          onClick={() => {
+            setShow('showCompanionPanel', !showCompanionPanel)
+            if (!showCompanionPanel) {
+              setShow('showMcpPanel', false)
+              setShow('showAgentsPanel', false)
+            }
+          }}
+          title="LocalForge Companion bridge · discovery · hardware"
+          aria-expanded={showCompanionPanel}
+        >
+          <span className={`status-dot ${companionDot}`} />
+          <span className="dock-label">Companion</span>
+          <span className="dock-meta">{companionMeta}</span>
+        </button>
+
+        <button
+          className="dock-chip"
+          onClick={() => setShow('showPreview', true)}
+          title="Workspace static preview (loopback)"
+        >
+          <span className="dock-label">Preview</span>
+          <span className="dock-meta">
+            {gitSnapshot?.hasRepo ? gitSnapshot.branch || 'git' : 'static'}
+          </span>
         </button>
 
         {onlineOk ? (
@@ -149,6 +199,7 @@ export function ToolDock() {
 
       {showMcpPanel && <McpPanel />}
       {showAgentsPanel && <AgentsPanel />}
+      {showCompanionPanel && <CompanionPanel />}
     </div>
   )
 }

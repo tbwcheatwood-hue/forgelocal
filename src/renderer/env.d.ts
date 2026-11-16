@@ -1,4 +1,11 @@
 import type { AgentRole } from '../shared/agents'
+import type {
+  CompanionHealth,
+  CompanionPairResult,
+  DiscoveredProvider,
+  GitSnapshot,
+  HardwareInventory
+} from '../shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
 import type {
   AppSettings,
@@ -68,10 +75,30 @@ export interface ForgeApi {
   runApprovedCommand: (payload: {
     command: string
     cwd?: string
+    confirm?: boolean
   }) => Promise<
     | { ok: true; code: number; stdout: string; stderr: string }
-    | { ok: false; error?: string; stdout?: string; stderr?: string }
+    | { ok: false; error?: string; stdout?: string; stderr?: string; needsConfirm?: boolean }
   >
+  companionHealth: () => Promise<CompanionHealth>
+  companionPair: (code: string) => Promise<CompanionPairResult>
+  companionDisconnect: () => Promise<AppSettings>
+  companionWorkspaces: () => Promise<{
+    ok: boolean
+    status?: number
+    json?: unknown
+    error?: string
+  }>
+  discoverProviders: (extraUrls?: string[]) => Promise<DiscoveredProvider[]>
+  hardwareInventory: () => Promise<HardwareInventory>
+  gitSnapshot: () => Promise<GitSnapshot>
+  previewStart: (
+    previewDir?: string
+  ) => Promise<
+    { ok: true; url: string; token: string; root: string } | { ok: false; message: string }
+  >
+  previewStop: () => Promise<{ ok: true }>
+  previewStatus: () => Promise<{ active: boolean; url?: string; root?: string }>
   onTerminalData: (
     cb: (payload: { stream: 'stdout' | 'stderr'; data: string }) => void
   ) => () => void
