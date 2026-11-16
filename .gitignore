@@ -13,3 +13,10 @@ coverage
 .idea
 .vscode
 *.tsbuildinfo
+
+# Local machine notes / electron-store leftovers (never commit)
+WHERE-I-AM.txt
+config.local*.json
+*.config.json
+!config/config.example.json
+.electron-builder*

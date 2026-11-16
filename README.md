@@ -29,6 +29,24 @@ Runtime settings are stored locally via `electron-store` (not committed). The ex
 npm run dev
 ```
 
+On Linux, `npm run dev` sets `ELECTRON_DISABLE_SANDBOX=1` so Electron can start without a root-owned SUID `chrome-sandbox`. That is the supported local-dev path (no sudo required).
+
+If you prefer the real Chromium sandbox instead:
+
+```bash
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+```
+
+Then you can remove `ELECTRON_DISABLE_SANDBOX=1` from the `dev` / `preview` scripts in `package.json`. Note: re-running `npm install` may restore a non-root `chrome-sandbox`, so you would need to re-apply those permissions.
+
+### Linux troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `chrome-sandbox` / `setuid_sandbox_host` FATAL | Use `npm run dev` (sandbox already disabled in script), or apply the `chown`/`chmod` above |
+| Missing GTK / NSS libs | `sudo apt install libgtk-3-0 libnss3 libgbm1 libasound2` |
+
 ## Test / quality
 
 ```bash
