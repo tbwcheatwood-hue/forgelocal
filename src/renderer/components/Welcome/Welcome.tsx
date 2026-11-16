@@ -9,35 +9,39 @@ export function Welcome() {
 
   return (
     <div className="welcome">
-      <div className="welcome-card">
-        <div className="brand" style={{ marginBottom: 12 }}>
-          <span className="brand-mark" />
-          <span style={{ fontSize: 18 }}>ForgeLocal</span>
+      <div className="welcome-atmosphere" aria-hidden="true" />
+      <div className="welcome-composition">
+        <div className="welcome-brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <div className="welcome-brand-name">ForgeLocal</div>
         </div>
-        <h1>Local-first coding with LM Studio</h1>
-        <p>
-          Open a project, connect your local model, attach only the files you choose, and review
-          every AI edit before it lands.
+        <p className="welcome-headline">Local models. Your files. Your approval.</p>
+        <p className="welcome-support">
+          A calm desktop forge for coding with LM Studio — offline by default, with every AI edit
+          held for review before it lands.
         </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="welcome-cta">
           <button className="btn primary" onClick={() => openProject()}>
             Open project
           </button>
           <button className="btn" onClick={() => refreshLm()}>
             Test LM Studio
           </button>
-          <button className="btn" onClick={() => setShow('showSettings', true)}>
+          <button className="btn ghost" onClick={() => setShow('showSettings', true)}>
             Settings
           </button>
         </div>
-        <div style={{ marginTop: 16 }} className="status-pill">
-          <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
-          {lmStatus?.message ?? 'LM Studio not tested yet'}
+        <div className="welcome-status">
+          <div className="label">Connection</div>
+          <div className="status-line" title={lmStatus?.message}>
+            <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
+            <span>{lmStatus?.message ?? 'LM Studio not tested yet'}</span>
+          </div>
         </div>
         {recent.length > 0 && (
           <div className="recent-list" aria-label="Recent projects">
-            <div style={{ color: 'var(--text-dim)', fontSize: 12, marginBottom: 4 }}>Recent</div>
-            {recent.map((p) => (
+            <div className="label">Recent</div>
+            {recent.slice(0, 5).map((p) => (
               <button key={p} onClick={() => openProject(p)}>
                 {p}
               </button>

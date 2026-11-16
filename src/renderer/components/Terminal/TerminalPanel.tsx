@@ -23,12 +23,11 @@ export function TerminalPanel() {
   return (
     <div className="terminal-panel" role="region" aria-label="Terminal">
       <div className="terminal-toolbar">
-        <strong style={{ fontSize: 12, color: 'var(--text-dim)' }}>Terminal · Command Cards</strong>
+        <strong>Terminal</strong>
         <input
-          style={{ flex: 1 }}
           value={manual}
           onChange={(e) => setManual(e.target.value)}
-          placeholder="Type a command, then Approve to run"
+          placeholder="Command card — Enter to stage for approval"
           aria-label="Manual command"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && manual.trim()) {
@@ -57,7 +56,7 @@ export function TerminalPanel() {
         </div>
       )}
       <div className="terminal-output">
-        {terminalLog || 'Ready. AI commands appear as cards and need approval.'}
+        {terminalLog || 'Ready. AI commands appear as glass command cards and need your approval.'}
       </div>
     </div>
   )

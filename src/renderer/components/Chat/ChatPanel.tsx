@@ -26,30 +26,20 @@ export function ChatPanel() {
   const disconnected = !lmStatus || lmStatus.status !== 'connected'
 
   return (
-    <div
-      className="panel"
-      style={{ borderLeft: '1px solid var(--border-soft)', borderRight: 'none' }}
-    >
+    <div className="panel ai-panel">
       <div className="panel-header">
-        <span>AI Assistant</span>
+        <span>Assistant</span>
         <button className="btn ghost" onClick={() => refreshLm()} title="Test LM Studio connection">
           Refresh
         </button>
       </div>
 
-      <div
-        style={{
-          padding: 10,
-          borderBottom: '1px solid var(--border-soft)',
-          display: 'grid',
-          gap: 8
-        }}
-      >
-        <div className="status-pill" title={lmStatus?.message}>
+      <div className="chat-toolbar">
+        <div className="status-line" title={lmStatus?.message}>
           <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
-          {lmStatus?.message ?? 'LM Studio status unknown'}
+          <span>{lmStatus?.message ?? 'LM Studio status unknown'}</span>
         </div>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--text-dim)' }}>
+        <label>
           Model
           <select
             value={settings.provider.model}
@@ -68,9 +58,12 @@ export function ChatPanel() {
 
       <div className="panel-body chat-messages" aria-live="polite">
         {!session?.messages.length && (
-          <div className="empty-state">
-            Select context files, then ask the local model for help. Edits appear as reviewable
-            diffs.
+          <div className="chat-empty">
+            <h3>Ask with intent</h3>
+            <p>
+              Attach only the files you choose, then prompt your local model. Proposed edits arrive
+              as reviewable diffs — never silent overwrites.
+            </p>
           </div>
         )}
         {session?.messages.map((msg) => (
@@ -88,7 +81,7 @@ export function ChatPanel() {
       <div className="chat-composer">
         <div className="context-chips" aria-label="Selected context files">
           {contextFiles.length === 0 && (
-            <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+            <span className="composer-hint">
               No context selected — only your prompt will be sent.
             </span>
           )}
@@ -121,7 +114,16 @@ export function ChatPanel() {
             }
           }}
         />
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div
+          style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          {disconnected ? (
+            <span className="composer-hint warn">
+              Connect LM Studio to send · localhost:1234/v1
+            </span>
+          ) : (
+            <span className="composer-hint">Ctrl/⌘ + Enter to send</span>
+          )}
           {streaming ? (
             <button className="btn danger" onClick={() => cancelPrompt()}>
               Cancel
@@ -136,11 +138,6 @@ export function ChatPanel() {
             </button>
           )}
         </div>
-        {disconnected && (
-          <div className="error-state" style={{ padding: 0, textAlign: 'left' }}>
-            Connect LM Studio to send prompts. Default URL: http://localhost:1234/v1
-          </div>
-        )}
       </div>
     </div>
   )

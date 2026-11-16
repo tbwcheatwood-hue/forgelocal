@@ -1,6 +1,40 @@
-import Editor from '@monaco-editor/react'
+import Editor, { loader, type BeforeMount } from '@monaco-editor/react'
+import * as monacoEditor from 'monaco-editor'
 import { useAppStore } from '../../stores/appStore'
 import { RadialMenu } from '../Canvas/RadialMenu'
+
+// Bundle Monaco locally — never fetch the CDN (required for offline Electron).
+loader.config({ monaco: monacoEditor })
+
+const beforeMount: BeforeMount = (monaco) => {
+  monaco.editor.defineTheme('forgelocal-ember', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '756c62', fontStyle: 'italic' },
+      { token: 'string', foreground: '7fafa3' },
+      { token: 'keyword', foreground: 'e0a06a' },
+      { token: 'number', foreground: 'd4b06a' },
+      { token: 'type', foreground: 'c9b8a4' }
+    ],
+    colors: {
+      'editor.background': '#0a0908',
+      'editor.foreground': '#f3eee6',
+      'editorLineNumber.foreground': '#756c62',
+      'editorLineNumber.activeForeground': '#a89f93',
+      'editorCursor.foreground': '#e0a06a',
+      'editor.selectionBackground': '#e0a06a33',
+      'editor.inactiveSelectionBackground': '#e0a06a1a',
+      'editor.lineHighlightBackground': '#1a171480',
+      'editorIndentGuide.background': '#2a251f',
+      'editorIndentGuide.activeBackground': '#3a332c',
+      'editorWidget.background': '#12100e',
+      'editorWidget.border': '#3a332c',
+      'input.background': '#0a0908',
+      focusBorder: '#e0a06a'
+    }
+  })
+}
 
 export function EditorPane() {
   const openFiles = useAppStore((s) => s.openFiles)
@@ -21,9 +55,13 @@ export function EditorPane() {
 
   if (!active) {
     return (
-      <div className="empty-state">
-        <p>No file open.</p>
-        <p>Select a file from the tree or add context for the AI assistant.</p>
+      <div className="editor-empty">
+        <div className="editor-empty-inner">
+          <h2>Open a file</h2>
+          <p>
+            Choose something from the tree, or mark files as AI context when you are ready to ask.
+          </p>
+        </div>
       </div>
     )
   }
@@ -68,19 +106,23 @@ export function EditorPane() {
         <Editor
           key={active.path}
           height="100%"
-          theme="vs-dark"
+          theme="forgelocal-ember"
           language={active.language}
           value={active.content}
+          beforeMount={beforeMount}
           onChange={(value) => updateFileContent(active.path, value ?? '')}
           options={{
             fontSize,
-            fontFamily: 'IBM Plex Mono, Cascadia Code, Fira Code, ui-monospace, monospace',
+            fontFamily: 'JetBrains Mono, Cascadia Code, Fira Code, ui-monospace, monospace',
             fontLigatures: true,
             minimap: { enabled: false },
             automaticLayout: true,
             scrollBeyondLastLine: false,
             wordWrap: 'on',
-            tabSize: 2
+            tabSize: 2,
+            padding: { top: 12 },
+            renderLineHighlight: 'line',
+            smoothScrolling: true
           }}
         />
         <RadialMenu />

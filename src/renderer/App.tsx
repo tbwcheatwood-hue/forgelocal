@@ -27,6 +27,16 @@ export default function App() {
   }, [bootstrap])
 
   useEffect(() => {
+    // Demo/automation bridge — used for screenshots and local smoke scripts
+    const bridge = window as unknown as {
+      __forgeOpenProject?: (path?: string) => Promise<void>
+      __forgeOpenFile?: (path: string) => Promise<void>
+    }
+    bridge.__forgeOpenProject = (path?: string) => useAppStore.getState().openProject(path)
+    bridge.__forgeOpenFile = (path: string) => useAppStore.getState().openFile(path)
+  }, [])
+
+  useEffect(() => {
     const offs = [
       window.forge.onMenu('open-project', () => void openProject()),
       window.forge.onMenu('save', () => void saveActive()),
@@ -71,16 +81,7 @@ export default function App() {
           style={{ background: 'transparent', placeItems: 'end', padding: 16 }}
           onClick={() => setError(null)}
         >
-          <div
-            className="error-state"
-            style={{
-              background: 'var(--bg-2)',
-              border: '1px solid var(--danger)',
-              borderRadius: 8
-            }}
-          >
-            {error}
-          </div>
+          <div className="toast-error">{error}</div>
         </div>
       )}
     </div>

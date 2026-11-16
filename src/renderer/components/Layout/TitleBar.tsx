@@ -21,32 +21,41 @@ export function TitleBar() {
         {workspaceRoot ?? 'No project open'}
       </div>
       <div className="titlebar-actions">
-        <span className="status-pill" title={lmStatus?.message}>
+        <span className="status-line" title={lmStatus?.message}>
           <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
-          LM Studio
+          <span>LM Studio</span>
         </span>
-        <button className="btn" onClick={() => openProject()}>
+        <button className="btn ghost" onClick={() => openProject()}>
           Open
         </button>
-        <button className="btn" onClick={() => saveActive()}>
+        <button className="btn ghost" onClick={() => saveActive()}>
           Save
         </button>
-        <button className="btn" onClick={() => setShow('showAi', !showAi)}>
+        <button
+          className={`btn ${showAi ? '' : 'ghost'}`}
+          onClick={() => setShow('showAi', !showAi)}
+        >
           AI
         </button>
-        <button className="btn" onClick={() => setShow('showTerminal', !showTerminal)}>
-          Terminal
+        <button
+          className={`btn ${showTerminal ? '' : 'ghost'}`}
+          onClick={() => setShow('showTerminal', !showTerminal)}
+        >
+          Term
         </button>
-        <button className="btn" onClick={() => setShow('showCanvas', !showCanvas)}>
+        <button
+          className={`btn ${showCanvas ? '' : 'ghost'}`}
+          onClick={() => setShow('showCanvas', !showCanvas)}
+        >
           Canvas
         </button>
-        <button className="btn" onClick={() => setShow('showCatalog', true)}>
+        <button className="btn ghost" onClick={() => setShow('showCatalog', true)}>
           Tools
         </button>
-        <button className="btn" onClick={() => setShow('showSettings', true)}>
+        <button className="btn ghost" onClick={() => setShow('showSettings', true)}>
           Settings
         </button>
-        <button className="btn ghost" onClick={() => refreshLm()}>
+        <button className="btn ghost" onClick={() => refreshLm()} title="Reconnect LM Studio">
           Reconnect
         </button>
       </div>

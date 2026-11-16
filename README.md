@@ -90,7 +90,7 @@ npm run package
 - **Security:** Workspace path confinement by default; destructive/unsafe commands blocked; AI edits never overwrite without approval
 - **Catalog:** Bundled offline JSON; unimplemented third-party stubs cannot be marked installed/enabled as working
 - **Polish layers:** Infinite canvas, ambient radial menu, and syntax dimming are optional catalog features layered after the core flow
-- **Fonts:** IBM Plex Sans (UI/AI) + IBM Plex Mono with ligatures (code). If fonts.googleapis.com is blocked offline, the UI falls back to system fonts
+- **Fonts / look:** Syne (UI/brand) + JetBrains Mono with ligatures (code). Visual direction is “forge ember” — deep ink, warm copper, quiet celadon — not purple/indigo dashboard chrome. If fonts.googleapis.com is blocked offline, the UI falls back to system fonts
 - **Terminal:** Uses approved `shell: true` child processes (Command Cards), not a full interactive PTY, for portability and explicit approval
 - **No telemetry / analytics / automatic cloud uploads**
 

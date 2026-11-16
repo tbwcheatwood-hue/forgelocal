@@ -10,10 +10,13 @@ export function StatusBar() {
 
   return (
     <footer className="statusbar" role="contentinfo">
-      <span>{workspaceRoot ? 'Workspace ready' : 'No workspace'}</span>
+      <span>{workspaceRoot ? 'workspace' : 'idle'}</span>
       {hasGit && settings.enabledTools['vcs-git-status'] !== false && <span>git</span>}
       <span>{settings.provider.model || 'no model'}</span>
-      <span>{lmStatus?.status ?? 'lm:unknown'}</span>
+      <span className="status-line">
+        <span className={`status-dot ${lmStatus?.status ?? 'unknown'}`} />
+        {lmStatus?.status ?? 'unknown'}
+      </span>
       <span style={{ marginLeft: 'auto' }}>{dirty ? `${dirty} unsaved` : 'clean'}</span>
     </footer>
   )

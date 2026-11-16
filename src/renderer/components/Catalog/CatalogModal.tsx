@@ -56,11 +56,11 @@ export function CatalogModal() {
         <div className="modal-header">
           <div>
             <strong>Tools & Extensions</strong>
-            <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
-              Offline bundled catalog · enable only implemented tools
+            <div style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 4 }}>
+              Offline catalog · enable only what this build implements
             </div>
           </div>
-          <button className="btn" onClick={() => setShow('showCatalog', false)}>
+          <button className="btn ghost" onClick={() => setShow('showCatalog', false)}>
             Close
           </button>
         </div>
