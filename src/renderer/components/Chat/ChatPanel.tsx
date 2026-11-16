@@ -279,9 +279,7 @@ export function ChatPanel() {
             if (files.length) void ingestDroppedFiles(files)
           }}
         />
-        <div
-          style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}
-        >
+        <div className="composer-actions">
           {overHard ? (
             <span className="composer-hint warn">
               Prompt too large ({promptChars.toLocaleString()} / {PROMPT_MAX_CHARS.toLocaleString()}{' '}
@@ -307,7 +305,7 @@ export function ChatPanel() {
               {composerAttachments.length ? ` · ${composerAttachments.length} attachment(s)` : ''}
             </span>
           )}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="composer-actions-buttons">
             <button
               className="btn ghost"
               type="button"
