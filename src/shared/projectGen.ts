@@ -111,10 +111,15 @@ export function parseProjectPlan(raw: string): {
   if (!text) return { ok: false, message: 'Empty plan response from the model.' }
 
   let jsonText = text
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+    // Strip common model “thinking” / channel wrappers that break JSON extraction.
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/analysis[\s\S]*?assistantfinal/gi, '')
+  const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i)
   if (fence?.[1]) jsonText = fence[1].trim()
   const brace = jsonText.match(/\{[\s\S]*\}/)
   if (brace) jsonText = brace[0]
+  // Soft-repair trailing commas before } or ]
+  jsonText = jsonText.replace(/,\s*([}\]])/g, '$1')
 
   let parsed: unknown
   try {
@@ -431,4 +436,29 @@ export function inferStackFromDescription(description: string): ProjectStack {
 
 export function planNeedsQuestions(plan: ProjectPlan): boolean {
   return (plan.questions?.length ?? 0) > 0 && plan.files.length === 0
+}
+
+/**
+ * Detect greenfield "build/create/generate me an app/project" prompts.
+ * These must use the project generator — chat-only diffs stay in the open workspace
+ * and often produce no files when no context is attached.
+ */
+export function isProjectGenerationIntent(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  if (!t || t.length > 2000) return false
+  // Explicit edits to existing files should stay in chat.
+  if (
+    /\b(fix|refactor|rename|debug|explain|review|optimize|test)\b/.test(t) &&
+    !/\b(new|create|generate|scaffold|build me|make me)\b/.test(t)
+  ) {
+    return false
+  }
+  const wantsNew =
+    /\b(build|create|generate|scaffold|make|spin\s*up|start)\b/.test(t) &&
+    /\b(app|application|project|website|web\s*app|site|dashboard|cli|spa|landing\s*page)\b/.test(t)
+  const greenfieldCue =
+    /\b(new|from scratch|greenfield|starter|boilerplate)\b/.test(t) ||
+    /\b(build me|create me|make me|generate me)\b/.test(t) ||
+    /\b(html\s*,?\s*css\s*(and|&)?\s*js|static\s+site)\b/.test(t)
+  return wantsNew && greenfieldCue
 }

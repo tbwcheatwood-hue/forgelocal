@@ -130,6 +130,7 @@ export interface ForgeApi {
     preferTemplate?: boolean
   }) => Promise<{ ok: true; plan: ProjectPlan } | { ok: false; error: string; plan?: ProjectPlan }>
   pickProjectParent: () => Promise<string | null>
+  defaultProjectParent: () => Promise<string>
   materializeProject: (
     parentDir: string,
     plan: ProjectPlan

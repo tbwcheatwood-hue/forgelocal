@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   inferStackFromDescription,
   planNeedsQuestions,
@@ -14,10 +14,12 @@ const STACKS: { id: ProjectStack; label: string; blurb: string }[] = [
 
 export function ProjectWizard() {
   const show = useAppStore((s) => s.showProjectWizard)
+  const seed = useAppStore((s) => s.projectWizardSeed)
   const busy = useAppStore((s) => s.projectGenBusy)
   const plan = useAppStore((s) => s.projectPlan)
   const lmStatus = useAppStore((s) => s.lmStatus)
   const close = useAppStore((s) => s.closeProjectWizard)
+  const clearSeed = useAppStore((s) => s.clearProjectWizardSeed)
   const planAiProject = useAppStore((s) => s.planAiProject)
   const materializeAiProject = useAppStore((s) => s.materializeAiProject)
   const setError = useAppStore((s) => s.setError)
@@ -28,6 +30,7 @@ export function ProjectWizard() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [preferTemplate, setPreferTemplate] = useState(false)
   const [step, setStep] = useState<'describe' | 'questions' | 'review'>('describe')
+  const [chatHandoff, setChatHandoff] = useState(false)
 
   const connected = lmStatus?.status === 'connected'
 
@@ -35,6 +38,32 @@ export function ProjectWizard() {
     if (stackTouched) return stack
     return description.trim() ? inferStackFromDescription(description) : stack
   }, [description, stack, stackTouched])
+
+  useEffect(() => {
+    if (!show || !seed) return
+    setDescription(seed)
+    setStep('describe')
+    setChatHandoff(true)
+    clearSeed()
+  }, [show, seed, clearSeed])
+
+  // Chat "build me an app" handoff: plan once automatically.
+  // Avoid cancelling on the chatHandoff→false re-render (that raced the async plan).
+  useEffect(() => {
+    if (!show || !chatHandoff || !description.trim()) return
+    const goal = description
+    setChatHandoff(false)
+    void (async () => {
+      const result = await planAiProject({
+        description: goal,
+        stackHint: inferStackFromDescription(goal),
+        preferTemplate: false
+      })
+      if (!result) return
+      if (planNeedsQuestions(result)) setStep('questions')
+      else setStep('review')
+    })()
+  }, [show, chatHandoff, description, planAiProject])
 
   if (!show) return null
 
@@ -44,6 +73,7 @@ export function ProjectWizard() {
     setPreferTemplate(false)
     setStep('describe')
     setStackTouched(false)
+    setChatHandoff(false)
   }
 
   const onClose = () => {
@@ -67,12 +97,12 @@ export function ProjectWizard() {
     setStep('review')
   }
 
-  const onCreate = async () => {
+  const onCreate = async (useDefaultParent = false) => {
     if (!plan || !plan.files.length) {
       setError('Plan has no files yet.')
       return
     }
-    const ok = await materializeAiProject(plan)
+    const ok = await materializeAiProject(plan, { useDefaultParent })
     if (ok) reset()
   }
 
@@ -93,7 +123,8 @@ export function ProjectWizard() {
         <div className="modal-body">
           <p className="project-wizard-lead">
             Describe what you want. ForgeLocal plans with your local model when available, or ships
-            an honest offline template you can refine in chat.
+            an honest offline template you can refine in chat. Chat prompts like “build me an app”
+            open this wizard so files land in a new folder — not the open workspace.
           </p>
 
           {step === 'describe' && (
@@ -141,6 +172,7 @@ export function ProjectWizard() {
                   : connected
                     ? 'LM Studio connected — AI plan preferred.'
                     : 'Model offline — will fall back to template if planning fails.'}
+                {busy ? ' Planning…' : ''}
               </div>
             </>
           )}
@@ -243,13 +275,23 @@ export function ProjectWizard() {
             </button>
           )}
           {step === 'review' && (
-            <button
-              className="btn primary"
-              disabled={busy || !plan?.files.length}
-              onClick={() => void onCreate()}
-            >
-              {busy ? 'Creating…' : 'Create & open'}
-            </button>
+            <>
+              <button
+                className="btn"
+                disabled={busy || !plan?.files.length}
+                onClick={() => void onCreate(true)}
+                title="Write into ~/ForgeLocalProjects without a folder dialog"
+              >
+                {busy ? 'Creating…' : 'Create in ~/ForgeLocalProjects'}
+              </button>
+              <button
+                className="btn primary"
+                disabled={busy || !plan?.files.length}
+                onClick={() => void onCreate(false)}
+              >
+                {busy ? 'Creating…' : 'Choose folder…'}
+              </button>
+            </>
           )}
         </div>
       </div>

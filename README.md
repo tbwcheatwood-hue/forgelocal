@@ -308,13 +308,13 @@ ForgeLocal does **not** replace its own filesystem with the companion — local 
 
 ForgeLocal can turn a short natural-language goal into a **working starter project**, then keep polishing it in the same IDE (chat, diffs, multi-agent, companion, attachments).
 
-1. **Welcome → New AI project** (or File → New AI Project / TitleBar **New**).
+1. **Welcome → New AI project** (or File → New AI Project / TitleBar **New**), **or** type a greenfield prompt in chat like “build me a new weather app” — ForgeLocal opens this wizard instead of editing the open workspace.
 2. Describe the goal and pick a stack hint: **static web**, **vanilla SPA**, or **Node CLI**.
 3. **Plan** with your loaded LM Studio / remote model (JSON plan). If the model is offline or returns unusable JSON, ForgeLocal uses an **offline template** and says so — no fake cloud service.
-4. Answer clarifying questions when the planner asks; review the file list; **Create & open** into a folder you choose.
+4. Answer clarifying questions when the planner asks; review the file list; **Create in ~/ForgeLocalProjects** or **Choose folder…**.
 5. Inside a workspace: TitleBar **Project** / dock **Project** → **Checkpoint** (stored under `.forgelocal/checkpoints`), **Restore**, or **Export zip**.
 
-Generated projects remember a small `.forgelocal/project.json` and appear under Welcome → Generated.
+Generated projects remember a small `.forgelocal/project.json` and appear under Welcome → Generated. Chat remains for edits inside an open project (attach context with `+`).
 
 ---
 

@@ -137,6 +137,7 @@ export interface ForgeApi {
     preferTemplate?: boolean
   }) => Promise<{ ok: true; plan: ProjectPlan } | { ok: false; error: string; plan?: ProjectPlan }>
   pickProjectParent: () => Promise<string | null>
+  defaultProjectParent: () => Promise<string>
   materializeProject: (
     parentDir: string,
     plan: ProjectPlan
@@ -231,6 +232,7 @@ const api: ForgeApi = {
   probeAllMcpServers: () => ipcRenderer.invoke('mcp:probeAll'),
   planProject: (payload) => ipcRenderer.invoke('project:plan', payload),
   pickProjectParent: () => ipcRenderer.invoke('project:pickParent'),
+  defaultProjectParent: () => ipcRenderer.invoke('project:defaultParent'),
   materializeProject: (parentDir, plan) =>
     ipcRenderer.invoke('project:materialize', parentDir, plan),
   createCheckpoint: (label) => ipcRenderer.invoke('project:checkpointCreate', label),
