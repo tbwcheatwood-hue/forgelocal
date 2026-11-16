@@ -89,7 +89,7 @@ npm run package
 - **Provider:** OpenAI-compatible local API only; default `http://localhost:1234/v1`
 - **Security:** Workspace path confinement by default; destructive/unsafe commands blocked; AI edits never overwrite without approval
 - **Catalog:** Bundled offline JSON; unimplemented third-party stubs cannot be marked installed/enabled as working
-- **Polish layers:** Infinite canvas, ambient radial menu, and syntax dimming are optional catalog features layered after the core flow
+- **Polish layers:** Infinite canvas + focus lens, ghost-layer diffs (Tab/Esc), intent radial (Extract/Optimize/Tests/Explain), glass Command Cards + LM/MCP/token dock, and selection syntax dimming. Optional catalog tools default on for the gift experience; MCP dock remains a non-executable stub; VRAM meter is honestly `n/a`
 - **Fonts / look:** Syne (UI/brand) + JetBrains Mono with ligatures (code). Visual direction is “forge ember” — deep ink, warm copper, quiet celadon — not purple/indigo dashboard chrome. If fonts.googleapis.com is blocked offline, the UI falls back to system fonts
 - **Terminal:** Uses approved `shell: true` child processes (Command Cards), not a full interactive PTY, for portability and explicit approval
 - **No telemetry / analytics / automatic cloud uploads**
