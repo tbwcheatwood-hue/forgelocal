@@ -781,7 +781,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       )
       if (!ok) return
     }
-    const updated = await window.forge.applyEdit(edit, decision)
+    let updated: ProposedEdit
+    try {
+      updated = await window.forge.applyEdit(edit, decision)
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err) })
+      return
+    }
     const session = get().session
     if (!session) return
     const next: ChatSession = {
@@ -791,28 +797,35 @@ export const useAppStore = create<AppState>((set, get) => ({
         proposedEdits: m.proposedEdits?.map((e) => (e.id === edit.id ? updated : e))
       }))
     }
-    set({ session: next, ghostIndex: 0 })
+    set({ session: next, ghostIndex: 0, error: null })
     if (decision === 'accepted') {
-      const open = get().openFiles.find((f) => f.path === edit.path)
+      const writtenPath = updated.path
+      const open = get().openFiles.find(
+        (f) =>
+          f.path === writtenPath || f.path === edit.path || f.relativePath === updated.relativePath
+      )
       if (open) {
         set({
           openFiles: get().openFiles.map((f) =>
-            f.path === edit.path
+            f.path === open.path
               ? {
                   ...f,
+                  path: writtenPath,
+                  relativePath: updated.relativePath || f.relativePath,
                   content: edit.proposedContent,
                   originalContent: edit.proposedContent,
                   dirty: false
                 }
               : f
-          )
+          ),
+          activePath: writtenPath
         })
-      } else if (edit.path) {
+      } else if (writtenPath) {
         try {
-          await get().openFile(edit.path)
+          await get().openFile(writtenPath)
           set({
             openFiles: get().openFiles.map((f) =>
-              f.path === edit.path
+              f.path === writtenPath
                 ? {
                     ...f,
                     content: edit.proposedContent,
