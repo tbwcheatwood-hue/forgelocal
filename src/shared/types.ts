@@ -38,6 +38,15 @@ export interface ProviderSettings {
   model: string
   timeoutMs: number
   stream: boolean
+  /** Sampling temperature for non-reasoning chat models (omitted for o-series / gpt-5). */
+  temperature?: number
+  /** Max generated tokens for /chat/completions (mapped to max_tokens or max_completion_tokens). */
+  maxOutputTokens?: number
+  /**
+   * Optional context window for client-side input+output budget checks.
+   * Left unset by default — LM Studio /models does not expose context length.
+   */
+  contextWindowTokens?: number
 }
 
 export interface PopoutBootstrap {
@@ -127,6 +136,7 @@ export interface ChatCompletionRequest {
   model: string
   stream?: boolean
   temperature?: number
+  maxOutputTokens?: number
 }
 
 export interface StreamChunk {
@@ -163,7 +173,10 @@ export const DEFAULT_PROVIDER: ProviderSettings = {
   apiKey: 'lm-studio',
   model: '',
   timeoutMs: 120000,
-  stream: true
+  stream: true,
+  temperature: 0.2,
+  maxOutputTokens: 4096
+  // contextWindowTokens intentionally unset — unknown per model from /v1/models
 }
 
 export const DEFAULT_REMOTE_PROVIDER: ProviderSettings = {
@@ -172,7 +185,9 @@ export const DEFAULT_REMOTE_PROVIDER: ProviderSettings = {
   apiKey: '',
   model: '',
   timeoutMs: 120000,
-  stream: true
+  stream: true,
+  temperature: 0.2,
+  maxOutputTokens: 4096
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

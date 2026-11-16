@@ -140,6 +140,8 @@ npm run package
 | Online tools hidden/disabled   | Local mode active or no remote model selected                                                  |
 | HTTP errors from chat          | Incompatible model, unloaded model, or bad request                                             |
 | Huge paste / prompt “crashes”  | Soft-warns ~24k chars; hard-blocks over 100k; context/history truncated for IPC + store safety |
+| Remote o-series / gpt-5 400s   | ForgeLocal omits `temperature` and sends `max_completion_tokens` for those model IDs           |
+| Token budget errors            | Set optional Context window tokens in Settings; input+max-output must fit                      |
 
 ## End-to-end flow
 
@@ -149,6 +151,21 @@ npm run package
 4. Prompt in the AI panel
 5. Review proposed diffs → Accept (writes after confirm) or Reject
 6. AI shell suggestions appear as Command Cards and need explicit approval
+
+## Token / chat payload handling
+
+ForgeLocal talks to OpenAI-compatible `POST /v1/chat/completions` for both local LM Studio and remote endpoints.
+
+| Mode / model family                                         | Output limit param      | Temperature                    |
+| ----------------------------------------------------------- | ----------------------- | ------------------------------ |
+| Local LM Studio (documented)                                | `max_tokens`            | Sent (default `0.2`)           |
+| Remote `api.openai.com`                                     | `max_completion_tokens` | Sent unless reasoning model    |
+| Remote o-series / gpt-5 IDs (`o1*`, `o3*`, `o4*`, `gpt-5*`) | `max_completion_tokens` | Omitted                        |
+| Other remote OpenAI-compat hosts                            | `max_tokens`            | Sent unless reasoning ID match |
+
+Defaults: `maxOutputTokens: 4096`, `temperature: 0.2`. Optional `contextWindowTokens` enables a client-side check that estimated input (chars÷4) + max output fits; `/v1/models` does **not** expose context length, so ForgeLocal never invents per-model windows.
+
+Evidence: [LM Studio Chat Completions params](https://lmstudio.ai/docs/developer/openai-compat/chat-completions) list `max_tokens` (not `max_completion_tokens`); [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat/create) document `max_completion_tokens` and note `max_tokens` is incompatible with o-series reasoning models.
 
 ## Stack / assumptions
 

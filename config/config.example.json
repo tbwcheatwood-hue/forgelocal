@@ -5,7 +5,9 @@
     "apiKey": "lm-studio",
     "model": "",
     "timeoutMs": 120000,
-    "stream": true
+    "stream": true,
+    "temperature": 0.2,
+    "maxOutputTokens": 4096
   },
   "theme": "dark",
   "fontSize": 14,

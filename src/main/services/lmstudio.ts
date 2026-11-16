@@ -5,6 +5,13 @@ import type {
   ProviderSettings,
   StreamChunk
 } from '../../shared/types'
+import {
+  buildChatCompletionBody,
+  filterChatModels,
+  resolveContextWindowTokens,
+  resolveOutputTokenLimit,
+  validateChatTokenBudget
+} from '../../shared/chatPayload'
 import { isRemoteMode } from '../../shared/providerTools'
 import { redactSecrets } from './security'
 
@@ -64,7 +71,7 @@ export class LmStudioService {
       }
 
       const data = (await res.json()) as { data?: LmModel[] }
-      const models = Array.isArray(data.data) ? data.data : []
+      const models = filterChatModels(Array.isArray(data.data) ? data.data : [])
       if (models.length === 0) {
         return {
           status: 'no-model',
@@ -150,16 +157,29 @@ export class LmStudioService {
       return
     }
 
+    const maxOut = resolveOutputTokenLimit({
+      ...provider,
+      maxOutputTokens: request.maxOutputTokens ?? provider.maxOutputTokens
+    })
+    const contextWindow = resolveContextWindowTokens(provider)
+    if (contextWindow != null) {
+      const budget = validateChatTokenBudget({
+        messages: request.messages,
+        maxOutputTokens: maxOut,
+        contextWindowTokens: contextWindow
+      })
+      if (!budget.ok) {
+        onChunk({ type: 'error', error: budget.message ?? 'Token budget exceeded' })
+        return
+      }
+    }
+
     const controller = new AbortController()
     this.abortControllers.set(requestId, controller)
     const timeout = setTimeout(() => controller.abort(), provider.timeoutMs || 120000)
 
-    const body = {
-      model: request.model || provider.model,
-      messages: request.messages,
-      stream: provider.stream && request.stream !== false,
-      temperature: request.temperature ?? 0.2
-    }
+    const built = buildChatCompletionBody({ ...provider, maxOutputTokens: maxOut }, request)
+    const body = built.body
 
     try {
       const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -184,7 +204,7 @@ export class LmStudioService {
       }
 
       if (body.stream && res.body) {
-        await this.consumeStream(res.body, onChunk, controller.signal)
+        await this.consumeStream(res.body as ReadableStream<Uint8Array>, onChunk, controller.signal)
       } else {
         const json = (await res.json()) as {
           choices?: Array<{ message?: { content?: string } }>

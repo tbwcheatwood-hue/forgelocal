@@ -32,6 +32,18 @@ export class SettingsService {
     if (provider.mode !== 'local' && provider.mode !== 'remote') {
       provider.mode = 'local'
     }
+    if (typeof provider.maxOutputTokens !== 'number' || provider.maxOutputTokens <= 0) {
+      provider.maxOutputTokens = DEFAULT_SETTINGS.provider.maxOutputTokens
+    }
+    if (typeof provider.temperature !== 'number') {
+      provider.temperature = DEFAULT_SETTINGS.provider.temperature
+    }
+    if (
+      provider.contextWindowTokens !== undefined &&
+      (typeof provider.contextWindowTokens !== 'number' || provider.contextWindowTokens <= 0)
+    ) {
+      delete provider.contextWindowTokens
+    }
     return {
       ...structuredClone(DEFAULT_SETTINGS),
       ...settings,

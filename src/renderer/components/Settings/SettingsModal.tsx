@@ -16,6 +16,13 @@ export function SettingsModal() {
   const [apiKey, setApiKey] = useState(settings.provider.apiKey)
   const [timeoutMs, setTimeoutMs] = useState(String(settings.provider.timeoutMs))
   const [stream, setStream] = useState(settings.provider.stream)
+  const [temperature, setTemperature] = useState(String(settings.provider.temperature ?? 0.2))
+  const [maxOutputTokens, setMaxOutputTokens] = useState(
+    String(settings.provider.maxOutputTokens ?? 4096)
+  )
+  const [contextWindowTokens, setContextWindowTokens] = useState(
+    settings.provider.contextWindowTokens ? String(settings.provider.contextWindowTokens) : ''
+  )
   const [fontSize, setFontSize] = useState(String(settings.fontSize))
   const [allowOutside, setAllowOutside] = useState(settings.allowPathsOutsideWorkspace)
 
@@ -91,6 +98,22 @@ export function SettingsModal() {
             Timeout (ms)
             <input value={timeoutMs} onChange={(e) => setTimeoutMs(e.target.value)} />
           </label>
+          <label>
+            Temperature (ignored for OpenAI o-series / gpt-5)
+            <input value={temperature} onChange={(e) => setTemperature(e.target.value)} />
+          </label>
+          <label>
+            Max output tokens
+            <input value={maxOutputTokens} onChange={(e) => setMaxOutputTokens(e.target.value)} />
+          </label>
+          <label>
+            Context window tokens (optional budget check)
+            <input
+              value={contextWindowTokens}
+              onChange={(e) => setContextWindowTokens(e.target.value)}
+              placeholder="Leave blank — /v1/models does not expose this"
+            />
+          </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={stream} onChange={(e) => setStream(e.target.checked)} />
             Stream responses when available
@@ -149,6 +172,11 @@ export function SettingsModal() {
                   apiKey,
                   timeoutMs: Number(timeoutMs) || 120000,
                   stream,
+                  temperature: Number(temperature) || 0.2,
+                  maxOutputTokens: Math.max(1, Number(maxOutputTokens) || 4096),
+                  contextWindowTokens: contextWindowTokens.trim()
+                    ? Math.max(1, Number(contextWindowTokens) || 0) || undefined
+                    : undefined,
                   // Clear model when switching mode so the user picks from the new endpoint
                   model: mode === settings.provider.mode ? settings.provider.model : ''
                 }
