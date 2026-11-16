@@ -3,6 +3,7 @@ import type { ChatMessageContent } from './attachments'
 import { DEFAULT_COMPANION_BRIDGE, type CompanionBridgeSettings } from './companion'
 import type { McpServerConfig } from './mcp'
 import type { ProjectRecord } from './projectGen'
+import { DEFAULT_WORKSPACE_LAYOUT, type WorkspaceLayout } from './workspaceLayout'
 
 export type TrustStatus = 'built-in' | 'optional' | 'third-party'
 
@@ -85,6 +86,8 @@ export interface AppSettings {
   companion: CompanionBridgeSettings
   /** Relative preview root inside the workspace (Companion-style static preview). */
   previewDir: string
+  /** Dockable panel layout (zones, sizes, minimize/maximize). */
+  workspaceLayout: WorkspaceLayout
 }
 
 export interface FileNode {
@@ -236,5 +239,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   mcpServers: [],
   agentTeam: structuredClone(DEFAULT_AGENT_TEAM),
   companion: structuredClone(DEFAULT_COMPANION_BRIDGE),
-  previewDir: '.'
+  previewDir: '.',
+  workspaceLayout: structuredClone(DEFAULT_WORKSPACE_LAYOUT)
 }

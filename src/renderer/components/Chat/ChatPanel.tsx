@@ -10,6 +10,7 @@ import {
   PROMPT_SOFT_CHARS,
   UI_MESSAGE_COLLAPSE_CHARS
 } from '@shared/messageLimits'
+import { isProjectGenerationIntent } from '@shared/projectGen'
 
 function MessageBody({ content, streaming }: { content: string; streaming: boolean }) {
   const [expanded, setExpanded] = useState(false)
@@ -77,9 +78,18 @@ export function ChatPanel() {
   const promptWords = estimateWordCount(prompt)
   const overHard = promptChars > PROMPT_MAX_CHARS
   const overSoft = promptChars >= PROMPT_SOFT_CHARS
+  const genIntent = isProjectGenerationIntent(prompt)
+  const projectGenBusy = useAppStore((s) => s.projectGenBusy)
+  // Generation can use offline templates when LM Studio is down.
+  const canSend =
+    Boolean(prompt.trim()) &&
+    !streaming &&
+    !projectGenBusy &&
+    !overHard &&
+    (genIntent || (!disconnected && Boolean(settings.provider.model)))
 
   const submit = async () => {
-    if (!prompt.trim() || streaming || overHard) return
+    if (!canSend) return
     const toSend = prompt
     setPrompt('')
     await sendPrompt(toSend)
@@ -290,7 +300,7 @@ export function ChatPanel() {
               Large prompt (~{promptWords.toLocaleString()} words). Still sendable; models may
               struggle.
             </span>
-          ) : disconnected ? (
+          ) : disconnected && !genIntent ? (
             <span className="composer-hint warn">
               {remote
                 ? 'Connect remote API in Settings (base URL + API key)'
@@ -298,7 +308,9 @@ export function ChatPanel() {
             </span>
           ) : (
             <span className="composer-hint">
-              Ctrl/⌘ + Enter · {visionOk ? 'vision model' : 'text/PDF/docx extract (no vision)'}
+              {genIntent
+                ? 'App generation · plans, writes to ~/ForgeLocalProjects, starts preview'
+                : `Ctrl/⌘ + Enter · ${visionOk ? 'vision model' : 'text/PDF/docx extract (no vision)'}`}
               {promptChars > 0
                 ? ` · ${promptChars.toLocaleString()} chars / ~${promptWords.toLocaleString()} words`
                 : ''}
@@ -309,7 +321,7 @@ export function ChatPanel() {
             <button
               className="btn ghost"
               type="button"
-              disabled={streaming}
+              disabled={streaming || projectGenBusy}
               onClick={() => void pickComposerAttachments()}
               title="Browse files to attach"
             >
@@ -318,28 +330,22 @@ export function ChatPanel() {
             <button
               className="btn ghost"
               type="button"
-              disabled={streaming}
+              disabled={streaming || projectGenBusy}
               onClick={() => fileInputRef.current?.click()}
               title="Pick files from a file input"
             >
               Browse
             </button>
-            {streaming ? (
-              <button className="btn danger" onClick={() => cancelPrompt()}>
-                Cancel
+            {streaming || projectGenBusy ? (
+              <button
+                className="btn danger"
+                onClick={() => cancelPrompt()}
+                disabled={projectGenBusy}
+              >
+                {projectGenBusy ? 'Generating…' : 'Cancel'}
               </button>
             ) : (
-              <button
-                className="btn primary"
-                disabled={
-                  !prompt.trim() ||
-                  disconnected ||
-                  !settings.provider.model ||
-                  overHard ||
-                  streaming
-                }
-                onClick={() => void submit()}
-              >
+              <button className="btn primary" disabled={!canSend} onClick={() => void submit()}>
                 Send
               </button>
             )}

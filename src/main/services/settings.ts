@@ -4,6 +4,7 @@ import { normalizeCompanionBridge } from '../../shared/companion'
 import type { AppSettings, ChatSession, ProviderSettings } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import { truncateChatSessionForStorage } from '../../shared/messageLimits'
+import { normalizeWorkspaceLayout } from '../../shared/workspaceLayout'
 
 interface StoreSchema {
   settings: AppSettings
@@ -77,7 +78,8 @@ export class SettingsService {
           : DEFAULT_SETTINGS.previewDir,
       rememberedProjects: Array.isArray(settings.rememberedProjects)
         ? settings.rememberedProjects.slice(0, 24)
-        : []
+        : [],
+      workspaceLayout: normalizeWorkspaceLayout(settings.workspaceLayout)
     }
   }
 
@@ -111,7 +113,11 @@ export class SettingsService {
       rememberedProjects:
         partial.rememberedProjects !== undefined
           ? partial.rememberedProjects.slice(0, 24)
-          : current.rememberedProjects
+          : current.rememberedProjects,
+      workspaceLayout:
+        partial.workspaceLayout !== undefined
+          ? normalizeWorkspaceLayout(partial.workspaceLayout)
+          : current.workspaceLayout
     }
     this.store.set('settings', next)
     return next

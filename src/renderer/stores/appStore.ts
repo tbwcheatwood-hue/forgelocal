@@ -15,12 +15,19 @@ import type {
 } from '@shared/companion'
 import type { McpServerConfig, McpServerProbeResult } from '@shared/mcp'
 import {
+  inferStackFromDescription,
   isProjectGenerationIntent,
+  planNeedsQuestions,
   type CheckpointMeta,
   type ProjectPlan,
   type ProjectRecord,
   type ProjectStack
 } from '@shared/projectGen'
+import {
+  normalizeWorkspaceLayout,
+  stackSupportsBrowserPreview,
+  type WorkspaceLayout
+} from '@shared/workspaceLayout'
 import type {
   AppSettings,
   CatalogItem,
@@ -103,6 +110,8 @@ interface AppState {
   gitSnapshot: GitSnapshot | null
   previewUrl: string | null
   previewRoot: string | null
+  previewStatus: 'idle' | 'loading' | 'success' | 'error' | 'unsupported'
+  previewMessage: string | null
 
   bootstrap: () => Promise<void>
   openProject: (path?: string) => Promise<void>
@@ -173,6 +182,7 @@ interface AppState {
   refreshGit: () => Promise<void>
   startPreview: (previewDir?: string) => Promise<void>
   stopPreview: () => Promise<void>
+  refreshPreviewIfActive: () => Promise<void>
   openProjectWizard: (seed?: string) => void
   closeProjectWizard: () => void
   clearProjectWizardSeed: () => void
@@ -184,8 +194,10 @@ interface AppState {
   }) => Promise<ProjectPlan | null>
   materializeAiProject: (
     plan: ProjectPlan,
-    opts?: { useDefaultParent?: boolean }
+    opts?: { useDefaultParent?: boolean; autoPreview?: boolean }
   ) => Promise<boolean>
+  runInlineProjectGeneration: (description: string) => Promise<void>
+  updateWorkspaceLayout: (layout: WorkspaceLayout) => void
   refreshCheckpoints: () => Promise<void>
   createProjectCheckpoint: (label?: string) => Promise<void>
   restoreProjectCheckpoint: (id: string) => Promise<void>
@@ -260,6 +272,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitSnapshot: null,
   previewUrl: null,
   previewRoot: null,
+  previewStatus: 'idle',
+  previewMessage: null,
   ghostIndex: 0,
   canvasFocusPath: null,
   mcpQuery: '',
@@ -275,6 +289,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       'optional-ambient-radial',
       'optional-syntax-dimming',
       'optional-canvas',
+      'optional-workspace-preview',
       'thirdparty-mcp-dock',
       'builtin-mcp-stdio'
     ] as const) {
@@ -486,16 +501,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   sendPrompt: async (prompt: string) => {
     const trimmed = prompt.trim()
-    if (!trimmed || get().streaming) return
+    if (!trimmed || get().streaming || get().projectGenBusy) return
 
-    // Greenfield "build me an app" belongs in the project generator — chat diffs
-    // only edit the open workspace and often refuse without attached context.
+    // Greenfield "build me an app" → inline plan → write files → preview.
+    // Wizard remains available via TitleBar "New" for manual control.
     if (isProjectGenerationIntent(trimmed)) {
-      get().openProjectWizard(trimmed)
-      set({
-        error: null,
-        showAi: true
-      })
+      await get().runInlineProjectGeneration(trimmed)
       return
     }
 
@@ -817,6 +828,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       const tree = await window.forge.getTree()
       if (tree) set({ tree })
+      await get().refreshPreviewIfActive()
     }
     await window.forge.saveChatSession(next)
   },
@@ -1015,14 +1027,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   startPreview: async (previewDir) => {
+    const stack = get().projectPlan?.stack
+    if (stack && !stackSupportsBrowserPreview(stack)) {
+      set({
+        previewStatus: 'unsupported',
+        previewMessage:
+          stack === 'node-cli'
+            ? 'Node CLI projects have no browser preview — use Console (npm start / node).'
+            : 'This stack cannot use the static loopback preview.',
+        previewUrl: null,
+        previewRoot: null,
+        showPreview: true
+      })
+      return
+    }
+    set({ previewStatus: 'loading', previewMessage: null, showPreview: true })
     const result = await window.forge.previewStart(previewDir)
     if (!result.ok) {
-      set({ error: result.message, previewUrl: null, previewRoot: null })
+      set({
+        error: result.message,
+        previewUrl: null,
+        previewRoot: null,
+        previewStatus: 'error',
+        previewMessage: result.message
+      })
       return
     }
     set({
       previewUrl: result.url,
       previewRoot: result.root,
+      previewStatus: 'success',
+      previewMessage: null,
       showPreview: true,
       error: null,
       settings: await window.forge.getSettings()
@@ -1031,7 +1066,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   stopPreview: async () => {
     await window.forge.previewStop()
-    set({ previewUrl: null, previewRoot: null })
+    set({
+      previewUrl: null,
+      previewRoot: null,
+      previewStatus: 'idle',
+      previewMessage: null
+    })
+  },
+
+  refreshPreviewIfActive: async () => {
+    if (!get().previewUrl && get().previewStatus !== 'success') return
+    const dir = get().settings.previewDir || '.'
+    await get().startPreview(dir)
   },
 
   refreshMcpTools: async (serverId) => {
@@ -1064,6 +1110,146 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   closeProjectWizard: () => set({ showProjectWizard: false, projectWizardSeed: null }),
   clearProjectWizardSeed: () => set({ projectWizardSeed: null }),
+
+  updateWorkspaceLayout: (layout) => {
+    set({
+      settings: {
+        ...get().settings,
+        workspaceLayout: normalizeWorkspaceLayout(layout)
+      }
+    })
+  },
+
+  runInlineProjectGeneration: async (description: string) => {
+    const goal = description.trim()
+    if (!goal || get().projectGenBusy) return
+
+    const session = get().session ?? emptySession(get().workspaceRoot ?? undefined)
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: goal,
+      createdAt: Date.now()
+    }
+    const assistantId = crypto.randomUUID()
+    const progress = (text: string) => {
+      const cur = get().session
+      if (!cur) return
+      set({
+        session: {
+          ...cur,
+          updatedAt: Date.now(),
+          messages: cur.messages.map((m) => (m.id === assistantId ? { ...m, content: text } : m))
+        }
+      })
+    }
+
+    set({
+      showAi: true,
+      projectGenBusy: true,
+      error: null,
+      session: {
+        ...session,
+        title: session.messages.length ? session.title : goal.slice(0, 48),
+        updatedAt: Date.now(),
+        messages: [
+          ...session.messages,
+          userMsg,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: 'Planning your app…',
+            createdAt: Date.now()
+          }
+        ]
+      }
+    })
+
+    try {
+      const plan = await get().planAiProject({
+        description: goal,
+        stackHint: inferStackFromDescription(goal),
+        preferTemplate: false
+      })
+      if (!plan) {
+        progress('Planning failed. Try again, or use **New** for the offline template wizard.')
+        set({ projectGenBusy: false })
+        return
+      }
+
+      if (planNeedsQuestions(plan)) {
+        progress(
+          [
+            'I need a couple of clarifications before writing files:',
+            ...(plan.questions ?? []).map((q, i) => `${i + 1}. ${q.prompt}`),
+            '',
+            'Opening the project wizard so you can answer — then Create writes the project.'
+          ].join('\n')
+        )
+        set({
+          projectGenBusy: false,
+          projectPlan: plan,
+          showProjectWizard: true,
+          projectWizardSeed: goal
+        })
+        return
+      }
+
+      const fileList = plan.files
+        .slice(0, 12)
+        .map((f) => `• ${f.path}${f.description ? ` — ${f.description}` : ''}`)
+        .join('\n')
+      const warn = plan.warnings?.length ? `\n\nNote: ${plan.warnings.join(' ')}` : ''
+      progress(
+        [
+          `**Plan** (${plan.source}): ${plan.name}`,
+          plan.summary,
+          `Stack: ${plan.stack}`,
+          plan.features.length ? `Features: ${plan.features.join(', ')}` : '',
+          '',
+          `Writing ${plan.files.length} file(s) under ~/ForgeLocalProjects…`,
+          fileList,
+          warn
+        ]
+          .filter(Boolean)
+          .join('\n')
+      )
+
+      const ok = await get().materializeAiProject(plan, {
+        useDefaultParent: true,
+        autoPreview: true
+      })
+      if (!ok) {
+        progress(
+          (get().session?.messages.find((m) => m.id === assistantId)?.content ?? '') +
+            '\n\nCreate failed — see the error toast. You can retry from **New**.'
+        )
+        return
+      }
+
+      const root = get().workspaceRoot
+      const previewNote = stackSupportsBrowserPreview(plan.stack)
+        ? 'Preview started (loopback static server). Primary result is the running app in the Preview panel.'
+        : 'No browser preview for this stack — use Console / `npm start` for the CLI.'
+      progress(
+        [
+          `Created **${plan.name}** at \`${root}\` (${plan.files.length} files, source: ${plan.source}).`,
+          previewNote,
+          '',
+          'Follow-ups in chat edit this project as reviewable diffs (Accept/Reject). Preview refreshes after Accept when live.'
+        ].join('\n')
+      )
+      if (get().session) {
+        await window.forge.saveChatSession(get().session!)
+      }
+    } catch (err) {
+      progress(`Generation error: ${err instanceof Error ? err.message : String(err)}`)
+      set({
+        projectGenBusy: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+    }
+  },
 
   planAiProject: async (input) => {
     set({ projectGenBusy: true, error: null })
@@ -1109,6 +1295,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ projectGenBusy: false, error: result.error })
         return false
       }
+
+      // Keep the generation chat thread when present; otherwise start fresh.
+      const prior = get().session
+      const keepChat =
+        prior && prior.messages.some((m) => m.role === 'assistant' && m.content.includes('Plan'))
+
       set({
         workspaceRoot: result.root,
         tree: result.tree,
@@ -1116,17 +1308,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         openFiles: [],
         activePath: null,
         selectedContext: [],
-        session: emptySession(result.root),
+        session: keepChat
+          ? { ...prior!, workspacePath: result.root, updatedAt: Date.now() }
+          : emptySession(result.root),
         projectGenBusy: false,
         showProjectWizard: false,
         projectPlan: plan,
         settings: await window.forge.getSettings(),
-        error: null
+        error: null,
+        showPreview: true,
+        showAi: true,
+        showTerminal: true
       })
       await get().refreshCheckpoints()
       await get().refreshRememberedProjects()
       // Open README or index when present
-      const prefer = ['README.md', 'index.html', 'package.json', 'app.js']
+      const prefer = ['index.html', 'README.md', 'package.json', 'app.js']
       const findPrefer = (node: FileNode | null): string | null => {
         if (!node?.children) return null
         for (const name of prefer) {
@@ -1138,6 +1335,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       const openPath = findPrefer(result.tree)
       if (openPath) await get().openFile(openPath)
+
+      const autoPreview = opts?.autoPreview !== false
+      if (autoPreview) {
+        if (stackSupportsBrowserPreview(plan.stack)) {
+          await get().startPreview('.')
+        } else {
+          set({
+            previewStatus: 'unsupported',
+            previewMessage:
+              plan.stack === 'node-cli'
+                ? 'Node CLI — no iframe preview. Run via Console (npm start).'
+                : 'Browser preview not supported for this stack.',
+            previewUrl: null,
+            previewRoot: null,
+            showPreview: true
+          })
+        }
+      }
       return true
     } catch (err) {
       set({

@@ -1,25 +1,17 @@
 import { useEffect } from 'react'
 import { TitleBar } from './components/Layout/TitleBar'
 import { StatusBar } from './components/Layout/StatusBar'
-import { FileTree } from './components/FileTree/FileTree'
-import { EditorPane } from './components/Editor/EditorPane'
-import { ChatPanel } from './components/Chat/ChatPanel'
-import { TerminalPanel } from './components/Terminal/TerminalPanel'
 import { CatalogModal } from './components/Catalog/CatalogModal'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { Welcome } from './components/Welcome/Welcome'
-import { CanvasView } from './components/Canvas/CanvasView'
-import { PreviewPanel } from './components/Preview/PreviewPanel'
 import { ProjectWizard } from './components/Project/ProjectWizard'
 import { ProjectPanel } from './components/Project/ProjectPanel'
+import { WorkspaceShell } from './components/Layout/WorkspaceShell'
 import { useAppStore } from './stores/appStore'
 
 export default function App() {
   const bootstrap = useAppStore((s) => s.bootstrap)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
-  const showAi = useAppStore((s) => s.showAi)
-  const showCanvas = useAppStore((s) => s.showCanvas)
-  const showPreview = useAppStore((s) => s.showPreview)
   const error = useAppStore((s) => s.error)
   const setShow = useAppStore((s) => s.setShow)
   const openProject = useAppStore((s) => s.openProject)
@@ -38,10 +30,12 @@ export default function App() {
       __forgeOpenFile?: (path: string) => Promise<void>
       __forgeShowCanvas?: (show: boolean) => void
       __forgeInjectGhost?: () => void
+      __forgeGenerateFromChat?: (prompt: string) => Promise<void>
     }
     bridge.__forgeOpenProject = (path?: string) => useAppStore.getState().openProject(path)
     bridge.__forgeOpenFile = (path: string) => useAppStore.getState().openFile(path)
     bridge.__forgeShowCanvas = (show: boolean) => useAppStore.getState().setShow('showCanvas', show)
+    bridge.__forgeGenerateFromChat = (prompt: string) => useAppStore.getState().sendPrompt(prompt)
     bridge.__forgeInjectGhost = () => {
       const state = useAppStore.getState()
       const active = state.openFiles.find((f) => f.path === state.activePath)
@@ -100,28 +94,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <TitleBar />
-      {!workspaceRoot ? (
-        <Welcome />
-      ) : (
-        <div className={`main-grid ${showAi ? '' : 'no-ai'}`}>
-          <aside className="panel" aria-label="File tree">
-            <div className="panel-header">
-              <span>Files</span>
-            </div>
-            <div className="panel-body">
-              <FileTree />
-            </div>
-          </aside>
-          <section
-            className={`center-column ${showCanvas ? 'canvas-mode' : ''}`}
-            aria-label="Editor"
-          >
-            {showCanvas ? <CanvasView /> : showPreview ? <PreviewPanel /> : <EditorPane />}
-            <TerminalPanel />
-          </section>
-          {showAi && <ChatPanel />}
-        </div>
-      )}
+      {!workspaceRoot ? <Welcome /> : <WorkspaceShell />}
       <StatusBar />
       <CatalogModal />
       <SettingsModal />

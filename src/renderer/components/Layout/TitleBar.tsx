@@ -1,3 +1,4 @@
+import { resetWorkspaceLayout } from '@shared/workspaceLayout'
 import { useAppStore } from '../../stores/appStore'
 
 export function TitleBar() {
@@ -9,9 +10,18 @@ export function TitleBar() {
   const showAi = useAppStore((s) => s.showAi)
   const showTerminal = useAppStore((s) => s.showTerminal)
   const showCanvas = useAppStore((s) => s.showCanvas)
+  const showPreview = useAppStore((s) => s.showPreview)
   const showProjectPanel = useAppStore((s) => s.showProjectPanel)
   const lmStatus = useAppStore((s) => s.lmStatus)
   const refreshLm = useAppStore((s) => s.refreshLm)
+  const updateWorkspaceLayout = useAppStore((s) => s.updateWorkspaceLayout)
+  const updateSettings = useAppStore((s) => s.updateSettings)
+
+  const resetLayout = () => {
+    const next = resetWorkspaceLayout()
+    updateWorkspaceLayout(next)
+    void updateSettings({ workspaceLayout: next })
+  }
 
   return (
     <header className="titlebar" role="banner">
@@ -51,6 +61,13 @@ export function TitleBar() {
           AI
         </button>
         <button
+          className={`btn ${showPreview ? '' : 'ghost'}`}
+          onClick={() => setShow('showPreview', !showPreview)}
+          title="Show preview panel"
+        >
+          Preview
+        </button>
+        <button
           className={`btn ${showTerminal ? '' : 'ghost'}`}
           onClick={() => setShow('showTerminal', !showTerminal)}
         >
@@ -62,6 +79,15 @@ export function TitleBar() {
         >
           Canvas
         </button>
+        {workspaceRoot && (
+          <button
+            className="btn ghost"
+            onClick={resetLayout}
+            title="Reset dockable layout (Alt+Shift+R)"
+          >
+            Layout
+          </button>
+        )}
         <button className="btn ghost" onClick={() => setShow('showCatalog', true)}>
           Tools
         </button>

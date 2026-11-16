@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { isProjectGenerationIntent } from '@shared/projectGen'
 import { useAppStore } from '../../stores/appStore'
 
 export function Welcome() {
@@ -8,6 +10,23 @@ export function Welcome() {
   const refreshLm = useAppStore((s) => s.refreshLm)
   const lmStatus = useAppStore((s) => s.lmStatus)
   const setShow = useAppStore((s) => s.setShow)
+  const sendPrompt = useAppStore((s) => s.sendPrompt)
+  const projectGenBusy = useAppStore((s) => s.projectGenBusy)
+  const [goal, setGoal] = useState('')
+
+  const canGenerate =
+    Boolean(goal.trim()) &&
+    !projectGenBusy &&
+    (isProjectGenerationIntent(goal) || goal.trim().length >= 12)
+
+  const onGenerate = async () => {
+    const text = goal.trim()
+    if (!text || projectGenBusy) return
+    // Prefer generation phrasing so Send routes into the project generator.
+    const prompt = isProjectGenerationIntent(text) ? text : `Build me a new app: ${text}`
+    setGoal('')
+    await sendPrompt(prompt)
+  }
 
   return (
     <div className="welcome">
@@ -19,12 +38,47 @@ export function Welcome() {
         </div>
         <p className="welcome-headline">Local models. Your files. Your approval.</p>
         <p className="welcome-support">
-          A calm desktop forge for coding with LM Studio — describe a project, generate a starter,
-          then iterate with reviewable AI edits.
+          Describe an app, press Send — ForgeLocal plans, writes a runnable project under
+          ~/ForgeLocalProjects, and starts preview when the stack allows.
         </p>
+
+        <div className="welcome-generate" role="form" aria-label="Generate a new app">
+          <label className="field">
+            <span className="sr-only">Describe your app</span>
+            <textarea
+              rows={3}
+              value={goal}
+              placeholder="e.g. Build me a new calculator app with HTML, CSS, and JS"
+              onChange={(e) => setGoal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault()
+                  void onGenerate()
+                }
+              }}
+              disabled={projectGenBusy}
+            />
+          </label>
+          <div className="welcome-generate-actions">
+            <span className="composer-hint">
+              {projectGenBusy
+                ? 'Generating…'
+                : 'Ctrl/⌘ + Enter · offline template if the model is unavailable'}
+            </span>
+            <button
+              className="btn primary"
+              type="button"
+              disabled={!canGenerate}
+              onClick={() => void onGenerate()}
+            >
+              {projectGenBusy ? 'Working…' : 'Send'}
+            </button>
+          </div>
+        </div>
+
         <div className="welcome-cta">
-          <button className="btn primary" onClick={() => openProjectWizard()}>
-            New AI project
+          <button className="btn" onClick={() => openProjectWizard()}>
+            New AI project…
           </button>
           <button className="btn" onClick={() => openProject()}>
             Open project
