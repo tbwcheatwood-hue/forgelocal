@@ -4,7 +4,7 @@ import { buildMcpDockSnapshot } from '@shared/mcp'
 import { canUseOnlineTools, isRemoteMode } from '@shared/providerTools'
 import { McpPanel } from './McpPanel'
 
-/** Bottom dock: provider / MCP / online tools / pop-out / context budget. */
+/** Bottom dock: provider / MCP / online tools / context budget. */
 export function ToolDock() {
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const lmStatus = useAppStore((s) => s.lmStatus)
@@ -17,7 +17,6 @@ export function ToolDock() {
   const mcpLoading = useAppStore((s) => s.mcpLoading)
   const setShow = useAppStore((s) => s.setShow)
   const refreshLm = useAppStore((s) => s.refreshLm)
-  const popoutIde = useAppStore((s) => s.popoutIde)
   const setCatalogFilters = useAppStore((s) => s.setCatalogFilters)
 
   const mcp = useMemo(
@@ -101,15 +100,6 @@ export function ToolDock() {
             <span className="dock-meta">local only</span>
           </div>
         )}
-
-        <button
-          className="dock-chip"
-          onClick={() => void popoutIde()}
-          title="Open IDE in a separate window (workspace + open tabs restored when possible)"
-        >
-          <span className="dock-label">Pop-out</span>
-          <span className="dock-meta">IDE</span>
-        </button>
 
         <div
           className="dock-chip static"

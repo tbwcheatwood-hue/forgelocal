@@ -9,11 +9,10 @@ import { CatalogModal } from './components/Catalog/CatalogModal'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { Welcome } from './components/Welcome/Welcome'
 import { CanvasView } from './components/Canvas/CanvasView'
-import { isPopoutWindow, useAppStore } from './stores/appStore'
+import { useAppStore } from './stores/appStore'
 
 export default function App() {
   const bootstrap = useAppStore((s) => s.bootstrap)
-  const applyPopoutBootstrap = useAppStore((s) => s.applyPopoutBootstrap)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const showAi = useAppStore((s) => s.showAi)
   const showCanvas = useAppStore((s) => s.showCanvas)
@@ -24,20 +23,8 @@ export default function App() {
   const setError = useAppStore((s) => s.setError)
 
   useEffect(() => {
-    void (async () => {
-      await bootstrap()
-      if (isPopoutWindow()) {
-        await applyPopoutBootstrap()
-      }
-    })()
-  }, [bootstrap, applyPopoutBootstrap])
-
-  useEffect(() => {
-    if (!isPopoutWindow()) return
-    return window.forge.onPopoutRefresh(() => {
-      void useAppStore.getState().applyPopoutBootstrap()
-    })
-  }, [])
+    void bootstrap()
+  }, [bootstrap])
 
   useEffect(() => {
     // Demo/automation bridge — used for screenshots and local smoke scripts

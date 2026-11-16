@@ -1,5 +1,5 @@
 import Store from 'electron-store'
-import type { AppSettings, ChatSession } from '../../shared/types'
+import type { AppSettings, ChatSession, ProviderSettings } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import { truncateChatSessionForStorage } from '../../shared/messageLimits'
 
@@ -7,6 +7,31 @@ interface StoreSchema {
   settings: AppSettings
   chatSessions: ChatSession[]
   pendingApprovals: never[]
+}
+
+/** Merge provider patches; explicitly clears contextWindowTokens when unset/invalid. */
+export function mergeProviderSettings(
+  current: ProviderSettings,
+  patch?: Partial<ProviderSettings>
+): ProviderSettings {
+  const provider = {
+    ...current,
+    ...(patch ?? {})
+  }
+  if (
+    patch &&
+    Object.prototype.hasOwnProperty.call(patch, 'contextWindowTokens') &&
+    (patch.contextWindowTokens == null || patch.contextWindowTokens <= 0)
+  ) {
+    delete provider.contextWindowTokens
+  }
+  if (
+    provider.contextWindowTokens !== undefined &&
+    (typeof provider.contextWindowTokens !== 'number' || provider.contextWindowTokens <= 0)
+  ) {
+    delete provider.contextWindowTokens
+  }
+  return provider
 }
 
 export class SettingsService {
@@ -25,10 +50,7 @@ export class SettingsService {
 
   getSettings(): AppSettings {
     const settings = this.store.get('settings')
-    const provider = {
-      ...DEFAULT_SETTINGS.provider,
-      ...(settings.provider ?? {})
-    }
+    const provider = mergeProviderSettings(DEFAULT_SETTINGS.provider, settings.provider ?? {})
     if (provider.mode !== 'local' && provider.mode !== 'remote') {
       provider.mode = 'local'
     }
@@ -37,12 +59,6 @@ export class SettingsService {
     }
     if (typeof provider.temperature !== 'number') {
       provider.temperature = DEFAULT_SETTINGS.provider.temperature
-    }
-    if (
-      provider.contextWindowTokens !== undefined &&
-      (typeof provider.contextWindowTokens !== 'number' || provider.contextWindowTokens <= 0)
-    ) {
-      delete provider.contextWindowTokens
     }
     return {
       ...structuredClone(DEFAULT_SETTINGS),
@@ -59,10 +75,7 @@ export class SettingsService {
     const next: AppSettings = {
       ...current,
       ...partial,
-      provider: {
-        ...current.provider,
-        ...(partial.provider ?? {})
-      },
+      provider: mergeProviderSettings(current.provider, partial.provider),
       enabledTools: {
         ...current.enabledTools,
         ...(partial.enabledTools ?? {})

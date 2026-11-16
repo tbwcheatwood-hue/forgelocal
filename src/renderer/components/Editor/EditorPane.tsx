@@ -1,45 +1,13 @@
 import { useEffect, useRef } from 'react'
-import Editor, { loader, type BeforeMount, type OnMount } from '@monaco-editor/react'
+import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 import type { editor as MonacoEditor } from 'monaco-editor'
-import * as monacoEditor from 'monaco-editor'
 import { useAppStore } from '../../stores/appStore'
+import { ensureForgeMonacoTheme, monaco as monacoEditor } from '../../lib/monacoSetup'
 import { RadialMenu } from '../Canvas/RadialMenu'
 import { GhostLayer } from '../DiffReview/GhostLayer'
 
-loader.config({ monaco: monacoEditor })
-
 const beforeMount: BeforeMount = (monaco) => {
-  monaco.editor.defineTheme('forgelocal-ember', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: '756c62', fontStyle: 'italic' },
-      { token: 'string', foreground: '7fafa3' },
-      { token: 'keyword', foreground: 'e0a06a' },
-      { token: 'number', foreground: 'd4b06a' },
-      { token: 'type', foreground: 'c9b8a4' }
-    ],
-    colors: {
-      'editor.background': '#0a0908',
-      'editor.foreground': '#f3eee6',
-      'editorLineNumber.foreground': '#756c62',
-      'editorLineNumber.activeForeground': '#a89f93',
-      'editorCursor.foreground': '#e0a06a',
-      'editor.selectionBackground': '#e0a06a33',
-      'editor.inactiveSelectionBackground': '#e0a06a1a',
-      'editor.lineHighlightBackground': '#1a171480',
-      'editorIndentGuide.background': '#2a251f',
-      'editorIndentGuide.activeBackground': '#3a332c',
-      'editorWidget.background': '#12100e',
-      'editorWidget.border': '#3a332c',
-      'input.background': '#0a0908',
-      focusBorder: '#e0a06a',
-      'diffEditor.insertedTextBackground': '#7fafa333',
-      'diffEditor.removedTextBackground': '#c47d4533',
-      'diffEditor.insertedLineBackground': '#7fafa31a',
-      'diffEditor.removedLineBackground': '#c47d451a'
-    }
-  })
+  ensureForgeMonacoTheme(monaco)
 }
 
 export function EditorPane() {

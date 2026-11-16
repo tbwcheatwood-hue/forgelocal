@@ -163,7 +163,7 @@ ForgeLocal talks to OpenAI-compatible `POST /v1/chat/completions` for both local
 | Remote o-series / gpt-5 IDs (`o1*`, `o3*`, `o4*`, `gpt-5*`) | `max_completion_tokens` | Omitted                        |
 | Other remote OpenAI-compat hosts                            | `max_tokens`            | Sent unless reasoning ID match |
 
-Defaults: `maxOutputTokens: 4096`, `temperature: 0.2`. Optional `contextWindowTokens` enables a client-side check that estimated input (chars÷4) + max output fits; `/v1/models` does **not** expose context length, so ForgeLocal never invents per-model windows.
+Defaults: `maxOutputTokens: 4096`, `temperature: 0.2`. Optional **AI context window** in Settings (presets or custom) enables client-side budget checks and context-file truncation so estimated input (chars÷4) + max output fits. LM Studio `/v1/models` typically does **not** expose GGUF context length — ForgeLocal never invents one. If a server does return metadata (`max_model_len`, `context_length`, …), values above that known limit are blocked, and an oversized saved window is cleared when switching models.
 
 Evidence: [LM Studio Chat Completions params](https://lmstudio.ai/docs/developer/openai-compat/chat-completions) list `max_tokens` (not `max_completion_tokens`); [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat/create) document `max_completion_tokens` and note `max_tokens` is incompatible with o-series reasoning models.
 
@@ -173,7 +173,7 @@ Evidence: [LM Studio Chat Completions params](https://lmstudio.ai/docs/developer
 - **Provider:** OpenAI-compatible API; default local `http://localhost:1234/v1`, optional remote endpoint via Settings
 - **Security:** Workspace path confinement by default; destructive/unsafe commands blocked; AI edits never overwrite without approval; online catalog tools gated to remote mode
 - **Catalog:** Bundled offline JSON; unimplemented third-party stubs cannot be marked installed/enabled as working
-- **Polish layers:** Infinite canvas + focus lens, ghost-layer diffs (Tab/Esc), intent radial (Extract/Optimize/Tests/Explain), glass Command Cards + LM/MCP/online/pop-out dock, and selection syntax dimming. Optional catalog tools default on for the gift experience; MCP dock is an honest stub (no live runtime); VRAM meter is honestly `n/a`
+- **Polish layers:** Infinite canvas + focus lens, ghost-layer diffs (Tab/Esc), intent radial (Extract/Optimize/Tests/Explain), glass Command Cards + LM/MCP/online dock, and selection syntax dimming. Optional catalog tools default on for the gift experience; MCP dock runs local stdio servers; VRAM meter is honestly `n/a`. The IDE stays in the main window (no pop-out).
 - **Fonts / look:** Syne (UI/brand) + JetBrains Mono with ligatures (code). Visual direction is “forge ember” — deep ink, warm copper, quiet celadon — not purple/indigo dashboard chrome. If fonts.googleapis.com is blocked offline, the UI falls back to system fonts
 - **Terminal:** Uses approved `shell: true` child processes (Command Cards), not a full interactive PTY, for portability and explicit approval
 - **No telemetry / analytics / automatic cloud uploads**

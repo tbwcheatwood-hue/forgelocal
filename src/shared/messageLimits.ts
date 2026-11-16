@@ -51,15 +51,40 @@ export function truncateText(
   return { text: text.slice(0, budget) + notice, truncated: true }
 }
 
+export interface PrepareContextOptions {
+  /** Optional token budget (chars÷4 heuristic) after reserving max output tokens. */
+  contextWindowTokens?: number
+  maxOutputTokens?: number
+  /** Estimated tokens already used by the prompt/system messages. */
+  reservedPromptTokens?: number
+}
+
 export function prepareContextFiles<
   T extends { relativePath: string; path: string; content: string }
->(files: T[]): { files: T[]; truncated: boolean; message?: string } {
+>(
+  files: T[],
+  options: PrepareContextOptions = {}
+): { files: T[]; truncated: boolean; message?: string } {
   let total = 0
   let truncated = false
   const out: T[] = []
 
+  const tokenBudget =
+    typeof options.contextWindowTokens === 'number' && options.contextWindowTokens > 0
+      ? Math.max(
+          0,
+          options.contextWindowTokens -
+            Math.max(0, options.maxOutputTokens ?? 0) -
+            Math.max(0, options.reservedPromptTokens ?? 0)
+        )
+      : undefined
+  // chars÷4 heuristic → allow about 4 chars per remaining token
+  const charBudgetFromTokens =
+    tokenBudget != null ? Math.max(0, tokenBudget * 4) : CONTEXT_TOTAL_MAX_CHARS
+  const totalCharBudget = Math.min(CONTEXT_TOTAL_MAX_CHARS, charBudgetFromTokens)
+
   for (const file of files) {
-    const remaining = CONTEXT_TOTAL_MAX_CHARS - total
+    const remaining = totalCharBudget - total
     if (remaining <= 0) {
       truncated = true
       break
@@ -73,13 +98,15 @@ export function prepareContextFiles<
 
   if (out.length < files.length) truncated = true
 
-  return {
-    files: out,
-    truncated,
-    message: truncated
-      ? `Context was truncated to stay under ${CONTEXT_TOTAL_MAX_CHARS.toLocaleString()} characters so the request stays stable.`
-      : undefined
+  let message: string | undefined
+  if (truncated) {
+    message =
+      tokenBudget != null
+        ? `Context was truncated to fit the ${options.contextWindowTokens!.toLocaleString()}-token window (after reserving output).`
+        : `Context was truncated to stay under ${CONTEXT_TOTAL_MAX_CHARS.toLocaleString()} characters so the request stays stable.`
   }
+
+  return { files: out, truncated, message }
 }
 
 export function truncateChatSessionForStorage<T extends { messages: unknown[] }>(session: T): T {

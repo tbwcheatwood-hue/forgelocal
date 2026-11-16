@@ -17,6 +17,7 @@ import {
   prepareContextFiles,
   STREAM_UI_MIN_INTERVAL_MS
 } from '@shared/messageLimits'
+import { applyContextWindowOnModelChange } from '@shared/contextWindow'
 import { detectLanguage } from '../lib/language'
 
 interface PendingCommand {
@@ -107,8 +108,6 @@ interface AppState {
   setSelectionText: (text: string) => void
   setGhostIndex: (index: number) => void
   setCanvasFocusPath: (path: string | null) => void
-  popoutIde: () => Promise<void>
-  applyPopoutBootstrap: () => Promise<void>
   setMcpQuery: (query: string) => void
   upsertMcpServer: (input: Partial<McpServerConfig>) => Promise<void>
   removeMcpServer: (id: string) => Promise<void>
@@ -189,7 +188,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       catalog,
       session: emptySession(),
       syntaxDimming: settings.enabledTools['optional-syntax-dimming'] !== false,
-      showCanvas: Boolean(settings.enabledTools['optional-canvas'])
+      // Canvas is opt-in via TitleBar — do not steal the editor on boot.
+      showCanvas: false
     })
     await get().refreshLm()
   },
@@ -303,45 +303,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   selectModel: async (model: string) => {
-    const settings = await window.forge.updateSettings({
-      provider: { ...get().settings.provider, model }
+    const adjusted = applyContextWindowOnModelChange({
+      provider: { ...get().settings.provider, model },
+      nextModelId: model,
+      models: get().models
     })
-    set({ settings })
-  },
-
-  popoutIde: async () => {
-    try {
-      const state = get()
-      await window.forge.popoutIde({
-        workspaceRoot: state.workspaceRoot,
-        openFilePaths: state.openFiles.map((f) => f.path),
-        activePath: state.activePath,
-        selectedContext: [...state.selectedContext]
-      })
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) })
-    }
-  },
-
-  applyPopoutBootstrap: async () => {
-    try {
-      const boot = await window.forge.getPopoutBootstrap()
-      if (!boot?.workspaceRoot) return
-      await get().openProject(boot.workspaceRoot)
-      for (const path of boot.openFilePaths) {
-        try {
-          await get().openFile(path)
-        } catch {
-          // skip missing files
-        }
-      }
-      if (boot.activePath) get().setActive(boot.activePath)
-      if (boot.selectedContext.length) {
-        set({ selectedContext: boot.selectedContext })
-      }
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) })
-    }
+    const settings = await window.forge.updateSettings({
+      provider: adjusted.provider
+    })
+    set({
+      settings,
+      error: adjusted.cleared
+        ? (adjusted.warning ?? 'Context window cleared after model switch.')
+        : get().error
+    })
   },
 
   sendPrompt: async (prompt: string) => {
@@ -365,6 +340,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const openFiles = get().openFiles
+    const provider = get().settings.provider
     const preparedContext = prepareContextFiles(
       openFiles
         .filter((f) => get().selectedContext.includes(f.path))
@@ -372,7 +348,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           path: f.path,
           relativePath: f.relativePath,
           content: f.content
-        }))
+        })),
+      {
+        contextWindowTokens: provider.contextWindowTokens,
+        maxOutputTokens: provider.maxOutputTokens ?? 4096,
+        reservedPromptTokens: Math.ceil(size.text.length / 4)
+      }
     )
     const contextFiles = preparedContext.files
 
@@ -635,7 +616,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         settings,
         syntaxDimming: Boolean(settings.enabledTools['optional-syntax-dimming']),
-        showCanvas: Boolean(settings.enabledTools['optional-canvas']),
+        // Disabling the canvas tool closes canvas; enabling it does not force it open.
+        showCanvas: id === 'optional-canvas' && !enabled ? false : get().showCanvas,
         error: null
       })
     } catch (err) {
@@ -739,8 +721,3 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }
 }))
-
-export function isPopoutWindow(): boolean {
-  if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).get('popout') === '1'
-}

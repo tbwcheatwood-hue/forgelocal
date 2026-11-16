@@ -1,8 +1,13 @@
 import { useEffect, useMemo } from 'react'
-import { DiffEditor } from '@monaco-editor/react'
+import { DiffEditor, type BeforeMount } from '@monaco-editor/react'
 import type { ProposedEdit } from '@shared/types'
 import { useAppStore } from '../../stores/appStore'
 import { detectLanguage } from '../../lib/language'
+import { ensureForgeMonacoTheme } from '../../lib/monacoSetup'
+
+const beforeMount: BeforeMount = (monaco) => {
+  ensureForgeMonacoTheme(monaco)
+}
 
 function pendingEdits(
   sessionMessages: ReturnType<typeof useAppStore.getState>['session']
@@ -104,6 +109,7 @@ export function GhostLayer() {
           language={detectLanguage(edit.relativePath)}
           original={edit.originalContent}
           modified={edit.proposedContent}
+          beforeMount={beforeMount}
           options={{
             readOnly: true,
             renderSideBySide: true,

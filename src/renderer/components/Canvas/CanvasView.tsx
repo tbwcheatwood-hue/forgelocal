@@ -1,8 +1,13 @@
 import { useMemo, useRef, useState } from 'react'
-import Editor from '@monaco-editor/react'
+import Editor, { type BeforeMount } from '@monaco-editor/react'
 import { useAppStore } from '../../stores/appStore'
 import { detectLanguage } from '../../lib/language'
 import { flattenFiles, layoutCanvasCards, relatedCards } from '../../lib/canvasLayout'
+import { ensureForgeMonacoTheme } from '../../lib/monacoSetup'
+
+const beforeMount: BeforeMount = (monaco) => {
+  ensureForgeMonacoTheme(monaco)
+}
 
 export function CanvasView() {
   const showCanvas = useAppStore((s) => s.showCanvas)
@@ -173,6 +178,7 @@ export function CanvasView() {
                   theme="forgelocal-ember"
                   language={detectLanguage(focusOpen.path)}
                   value={focusOpen.content}
+                  beforeMount={beforeMount}
                   options={{
                     readOnly: true,
                     fontSize: 12,

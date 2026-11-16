@@ -49,13 +49,6 @@ export interface ProviderSettings {
   contextWindowTokens?: number
 }
 
-export interface PopoutBootstrap {
-  workspaceRoot: string | null
-  openFilePaths: string[]
-  activePath: string | null
-  selectedContext: string[]
-}
-
 export interface AppSettings {
   provider: ProviderSettings
   theme: 'dark' | 'light'
@@ -121,6 +114,12 @@ export interface LmModel {
   id: string
   object: string
   owned_by?: string
+  /** Present only when a server actually returns it — never invented client-side. */
+  max_model_len?: number
+  max_context_length?: number
+  context_length?: number
+  context_window?: number
+  n_ctx?: number
 }
 
 export interface LmConnectionResult {

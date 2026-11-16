@@ -10,6 +10,10 @@ import { registerIpc } from './ipc/register'
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
 
+if (process.env.FORGE_DEBUG_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.FORGE_DEBUG_PORT)
+}
+
 const isDev = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
 

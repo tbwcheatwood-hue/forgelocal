@@ -1,13 +1,7 @@
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { randomUUID } from 'crypto'
-import { join } from 'path'
 import { spawn } from 'child_process'
-import type {
-  AppSettings,
-  ChatCompletionRequest,
-  PopoutBootstrap,
-  ProposedEdit
-} from '../../shared/types'
+import type { AppSettings, ChatCompletionRequest, ProposedEdit } from '../../shared/types'
 import {
   assertOnlineToolAllowed,
   disableRemoteOnlyTools,
@@ -23,7 +17,6 @@ import { LmStudioService } from '../services/lmstudio'
 import { McpService } from '../services/mcp'
 import { SettingsService } from '../services/settings'
 import { validateCommandSafety } from '../services/security'
-import { resolveAppIcon } from '../iconPath'
 
 export interface Services {
   fs: FilesystemService
@@ -32,9 +25,6 @@ export interface Services {
   catalog: CatalogService
   mcp: McpService
 }
-
-let popoutWindow: BrowserWindow | null = null
-let popoutBootstrap: PopoutBootstrap | null = null
 
 function applySettingsSideEffects(
   fileService: FilesystemService,
@@ -47,43 +37,6 @@ function applySettingsSideEffects(
     sanitized === next ? next : settings.updateSettings({ enabledTools: sanitized.enabledTools })
   fileService.setAllowOutside(finalSettings.allowPathsOutsideWorkspace)
   return finalSettings
-}
-
-function createPopoutBrowserWindow(): BrowserWindow {
-  const icon = resolveAppIcon()
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 800,
-    minHeight: 560,
-    show: false,
-    title: 'ForgeLocal IDE',
-    backgroundColor: '#0f1419',
-    ...(icon ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  })
-
-  win.on('ready-to-show', () => win.show())
-  win.on('closed', () => {
-    if (popoutWindow === win) popoutWindow = null
-  })
-
-  const isDev = !app.isPackaged
-  if (isDev && process.env.ELECTRON_RENDERER_URL) {
-    const url = new URL(process.env.ELECTRON_RENDERER_URL)
-    url.searchParams.set('popout', '1')
-    void win.loadURL(url.toString())
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), {
-      query: { popout: '1' }
-    })
-  }
-  return win
 }
 
 export function registerIpc(services: Services): void {
@@ -272,19 +225,6 @@ export function registerIpc(services: Services): void {
     const servers = settings.getSettings().mcpServers ?? []
     return mcp.probeAll(servers)
   })
-
-  ipcMain.handle('window:popoutIde', (_e, state: PopoutBootstrap) => {
-    popoutBootstrap = state
-    if (popoutWindow && !popoutWindow.isDestroyed()) {
-      popoutWindow.focus()
-      popoutWindow.webContents.send('window:popout-refresh', state)
-      return { ok: true as const, reused: true }
-    }
-    popoutWindow = createPopoutBrowserWindow()
-    return { ok: true as const, reused: false }
-  })
-
-  ipcMain.handle('window:getPopoutBootstrap', () => popoutBootstrap)
 
   ipcMain.handle('chat:sessions', () => settings.getChatSessions())
   ipcMain.handle('chat:save', (_e, session) => {

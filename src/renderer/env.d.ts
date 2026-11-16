@@ -7,7 +7,6 @@ import type {
   FileNode,
   LmConnectionResult,
   LmModel,
-  PopoutBootstrap,
   ProposedEdit,
   SearchResult,
   StreamChunk
@@ -62,9 +61,6 @@ export interface ForgeApi {
   confirm: (message: string, detail?: string) => Promise<boolean>
   openExternal: (url: string) => Promise<void>
   newId: () => Promise<string>
-  popoutIde: (state: PopoutBootstrap) => Promise<{ ok: true; reused: boolean }>
-  getPopoutBootstrap: () => Promise<PopoutBootstrap | null>
-  onPopoutRefresh: (cb: (state: PopoutBootstrap) => void) => () => void
   listMcpServers: () => Promise<McpServerConfig[]>
   upsertMcpServer: (input: Partial<McpServerConfig>) => Promise<AppSettings>
   removeMcpServer: (id: string) => Promise<AppSettings>
@@ -77,6 +73,13 @@ declare global {
   interface Window {
     forge: ForgeApi
   }
+}
+
+declare module '*?worker' {
+  const workerConstructor: {
+    new (): Worker
+  }
+  export default workerConstructor
 }
 
 export {}
