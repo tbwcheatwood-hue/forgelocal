@@ -500,6 +500,45 @@
     "sampleConfigJson": "{\n  \"mcpServers\": {\n    \"time\": {\n      \"command\": \"uvx\",\n      \"args\": [\"mcp-server-time\"]\n    }\n  }\n}"
   },
   {
+    "id": "optional-companion-bridge",
+    "name": "LocalForge Companion bridge",
+    "description": "Opt-in bridge to a LocalForge Companion service (health, pairing code, workspaces). Also surfaces Companion-inspired provider discovery, hardware inventory, and git snapshot in the Companion panel. Does not replace ForgeLocal's local filesystem.",
+    "category": "ai-tools",
+    "tags": ["companion", "localforge", "pairing", "discovery"],
+    "trust": "optional",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "requiresRemote": false,
+    "installGuidance": "Install LocalForge Companion 0.3.2 on this machine if you want pairing. Open Companion on the dock → Save URL (default http://127.0.0.1:7337) → paste pairing code. Attribution: NOTICE."
+  },
+  {
+    "id": "optional-provider-discover",
+    "name": "Local provider discovery",
+    "description": "Probe common local inference ports (Ollama 11434, LM Studio 1234, llama.cpp 8080/1337, Lemonade 8000) and apply a reachable endpoint as the ForgeLocal provider.",
+    "category": "ai-tools",
+    "tags": ["discovery", "ollama", "lmstudio", "llama.cpp"],
+    "trust": "optional",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "requiresRemote": false,
+    "installGuidance": "Companion panel → Discover local endpoints → Use as provider. Inspired by LocalForge Companion providers.js (MIT)."
+  },
+  {
+    "id": "optional-workspace-preview",
+    "name": "Workspace preview",
+    "description": "Loopback-only static preview server for a folder inside the open project (Companion-style path jail). No LAN bind.",
+    "category": "productivity",
+    "tags": ["preview", "static", "html"],
+    "trust": "optional",
+    "source": "bundled",
+    "implemented": true,
+    "enabledByDefault": true,
+    "requiresRemote": false,
+    "installGuidance": "Dock → Preview → set relative dir (., dist, public) → Start. Opens an iframe on 127.0.0.1."
+  },
+  {
     "id": "optional-multi-agent",
     "name": "Multi-agent teaming",
     "description": "LocalAGI-inspired cooperative roles (Planner → Implementer → Reviewer). Opt in from the Agents panel; Generate Team asks your model for a custom roster. Runs sequentially on your configured LM Studio / remote model — no cloud agent pool.",

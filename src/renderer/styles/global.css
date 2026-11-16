@@ -1635,6 +1635,187 @@ select:focus-visible,
   color: var(--text-dim);
 }
 
+/* LocalForge Companion–inspired panels — scoped (.lf-*) */
+.lf-companion,
+.lf-preview {
+  --lf-bg: #12141a;
+  --lf-panel: #1a1d27;
+  --lf-accent: #8b7cff;
+  --lf-accent-2: #5eead4;
+  --lf-border: rgba(139, 124, 255, 0.4);
+  margin: 8px 10px 0;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, rgba(139, 124, 255, 0.08), transparent 42%), var(--lf-panel);
+  border: 1px solid var(--lf-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  animation: lf-rise 0.3s ease-out;
+}
+
+.lf-companion-header,
+.lf-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.lf-companion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lf-mark {
+  color: var(--lf-accent);
+  text-shadow: 0 0 10px rgba(139, 124, 255, 0.55);
+}
+
+.lf-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  color: var(--lf-accent-2);
+  border-radius: 999px;
+}
+
+.lf-lead,
+.lf-meta {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+.lf-section {
+  margin-bottom: 14px;
+}
+
+.lf-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lf-accent);
+  margin-bottom: 6px;
+}
+
+.lf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.lf-companion input,
+.lf-preview input {
+  flex: 1;
+  min-width: 140px;
+  background: var(--lf-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.lf-glow {
+  box-shadow: 0 0 12px rgba(139, 124, 255, 0.35);
+}
+
+.lf-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.lf-card {
+  border-left: 3px solid var(--lf-accent);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+  border-radius: 0 8px 8px 0;
+}
+
+.lf-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lf-hw {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  display: grid;
+  gap: 4px;
+}
+
+.lf-pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  background: var(--lf-bg);
+  border-radius: 6px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.lf-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-preview-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 0 8px 6px;
+}
+
+.lf-preview-meta a {
+  color: var(--lf-accent-2);
+}
+
+.lf-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+  min-height: 280px;
+}
+
+.lf-preview-empty {
+  padding: 24px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+@keyframes lf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* LocalAGI-inspired Agents panel — scoped only (.lagi-*) */
 .lagi-agents {
   --lagi-primary: #00ff95;

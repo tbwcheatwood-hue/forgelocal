@@ -9,6 +9,7 @@ import { CatalogModal } from './components/Catalog/CatalogModal'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { Welcome } from './components/Welcome/Welcome'
 import { CanvasView } from './components/Canvas/CanvasView'
+import { PreviewPanel } from './components/Preview/PreviewPanel'
 import { useAppStore } from './stores/appStore'
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const showAi = useAppStore((s) => s.showAi)
   const showCanvas = useAppStore((s) => s.showCanvas)
+  const showPreview = useAppStore((s) => s.showPreview)
   const error = useAppStore((s) => s.error)
   const setShow = useAppStore((s) => s.setShow)
   const openProject = useAppStore((s) => s.openProject)
@@ -110,7 +112,7 @@ export default function App() {
             className={`center-column ${showCanvas ? 'canvas-mode' : ''}`}
             aria-label="Editor"
           >
-            {showCanvas ? <CanvasView /> : <EditorPane />}
+            {showCanvas ? <CanvasView /> : showPreview ? <PreviewPanel /> : <EditorPane />}
             <TerminalPanel />
           </section>
           {showAi && <ChatPanel />}

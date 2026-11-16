@@ -1,4 +1,5 @@
 import path from 'path'
+import { screenCommand } from '../../shared/commandScreen'
 
 const UNSAFE_COMMAND_PATTERNS = [
   /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?\/(?:\s|$)/,
@@ -45,24 +46,34 @@ export function assertSafeWorkspacePath(
   }
 }
 
+/**
+ * Legacy boolean API used by existing callers.
+ * Prefer screenCommand for hard-deny vs needs-confirm.
+ */
 export function validateCommandSafety(command: string): {
   safe: boolean
   reason?: string
+  needsConfirm?: boolean
 } {
-  const trimmed = command.trim()
-  if (!trimmed) {
-    return { safe: false, reason: 'Empty command' }
+  const screened = screenCommand(command, { confirm: false })
+  if (screened.allowed) return { safe: true }
+  // Keep legacy "unsafe" for hard denies; needsConfirm surfaces separately.
+  if (screened.needsConfirm) {
+    return { safe: false, reason: screened.reason, needsConfirm: true }
   }
+  // Also run legacy patterns for backwards-compatible messages in tests.
   for (const pattern of UNSAFE_COMMAND_PATTERNS) {
-    if (pattern.test(trimmed)) {
+    if (pattern.test(command.trim())) {
       return {
         safe: false,
-        reason: `Command matched an unsafe pattern and was blocked: ${pattern}`
+        reason: screened.reason || `Command matched an unsafe pattern and was blocked: ${pattern}`
       }
     }
   }
-  return { safe: true }
+  return { safe: false, reason: screened.reason }
 }
+
+export { screenCommand }
 
 export function redactSecrets(text: string): string {
   return text

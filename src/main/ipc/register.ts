@@ -11,14 +11,20 @@ import { checkPromptSize, prepareContextFiles, PROMPT_MAX_CHARS } from '../../sh
 import type { McpServerConfig } from '../../shared/mcp'
 import { validateMcpServerConfig } from '../../shared/mcp'
 import { normalizeAgentTeam } from '../../shared/agents'
+import { normalizeCompanionBridge } from '../../shared/companion'
+import { discoverProviders } from '../../shared/providersDiscover'
 import { AgentsService } from '../services/agents'
 import { CatalogService } from '../services/catalog'
+import { CompanionService } from '../services/companion'
 import { parseProposedEdits } from '../services/edits'
 import { FilesystemService } from '../services/filesystem'
+import { collectGitSnapshot } from '../services/git'
+import { collectLocalHardware } from '../services/hardware'
 import { LmStudioService } from '../services/lmstudio'
 import { McpService } from '../services/mcp'
+import { PreviewService } from '../services/preview'
 import { SettingsService } from '../services/settings'
-import { validateCommandSafety } from '../services/security'
+import { screenCommand } from '../services/security'
 
 export interface Services {
   fs: FilesystemService
@@ -27,6 +33,8 @@ export interface Services {
   catalog: CatalogService
   mcp: McpService
   agents: AgentsService
+  companion: CompanionService
+  preview: PreviewService
 }
 
 function applySettingsSideEffects(
@@ -43,7 +51,7 @@ function applySettingsSideEffects(
 }
 
 export function registerIpc(services: Services): void {
-  const { fs: fileService, settings, lm, catalog, mcp, agents } = services
+  const { fs: fileService, settings, lm, catalog, mcp, agents, companion, preview } = services
 
   ipcMain.handle('settings:get', () => settings.getSettings())
   ipcMain.handle('settings:update', (_e, partial: Partial<AppSettings>) => {
@@ -325,12 +333,83 @@ export function registerIpc(services: Services): void {
   })
   ipcMain.handle('chat:delete', (_e, id: string) => settings.deleteChatSession(id))
 
+  ipcMain.handle('companion:health', async () => {
+    const bridge = normalizeCompanionBridge(settings.getSettings().companion)
+    return companion.health(bridge)
+  })
+
+  ipcMain.handle('companion:pair', async (_e, code: string) => {
+    const current = settings.getSettings()
+    const result = await companion.pair(current.companion, code)
+    if (result.ok && result.bridge) {
+      settings.updateSettings({ companion: result.bridge })
+    }
+    return result
+  })
+
+  ipcMain.handle('companion:disconnect', () => {
+    const current = settings.getSettings()
+    return settings.updateSettings({
+      companion: { ...normalizeCompanionBridge(current.companion), token: '', enabled: false }
+    })
+  })
+
+  ipcMain.handle('companion:workspaces', async () => {
+    const bridge = normalizeCompanionBridge(settings.getSettings().companion)
+    if (!bridge.enabled || !bridge.token) {
+      return { ok: false as const, error: 'Companion bridge is off or not paired.' }
+    }
+    return companion.authenticatedGet(bridge, '/api/workspaces')
+  })
+
+  ipcMain.handle('providers:discover', async (_e, extraUrls?: string[]) => {
+    const featureOn = settings.getSettings().enabledTools['optional-provider-discover'] !== false
+    if (!featureOn) {
+      throw new Error('Provider discovery is disabled in the Tools catalog.')
+    }
+    return discoverProviders(Array.isArray(extraUrls) ? extraUrls : [])
+  })
+
+  ipcMain.handle('hardware:inventory', async () => collectLocalHardware())
+
+  ipcMain.handle('git:snapshot', async () => collectGitSnapshot(fileService.workspaceRoot))
+
+  ipcMain.handle('preview:start', async (_e, previewDir?: string) => {
+    const featureOn = settings.getSettings().enabledTools['optional-workspace-preview'] !== false
+    if (!featureOn) {
+      return { ok: false as const, message: 'Workspace preview is disabled in the Tools catalog.' }
+    }
+    const dir =
+      typeof previewDir === 'string' && previewDir.trim()
+        ? previewDir.trim()
+        : settings.getSettings().previewDir || '.'
+    const result = await preview.start(fileService.workspaceRoot, dir)
+    if (result.ok) {
+      settings.updateSettings({ previewDir: dir })
+    }
+    return result
+  })
+
+  ipcMain.handle('preview:stop', async () => {
+    await preview.stop()
+    return { ok: true as const }
+  })
+
+  ipcMain.handle('preview:status', () => preview.status())
+
   ipcMain.handle(
     'terminal:runApproved',
-    async (event, payload: { command: string; cwd?: string; requestId?: string }) => {
-      const safety = validateCommandSafety(payload.command)
-      if (!safety.safe) {
-        return { ok: false as const, error: safety.reason }
+    async (
+      event,
+      payload: { command: string; cwd?: string; requestId?: string; confirm?: boolean }
+    ) => {
+      const screened = screenCommand(payload.command, { confirm: Boolean(payload.confirm) })
+      if (!screened.allowed) {
+        return {
+          ok: false as const,
+          error: screened.reason,
+          needsConfirm: screened.needsConfirm
+        }
       }
       const cwd = payload.cwd || fileService.workspaceRoot || process.cwd()
       if (

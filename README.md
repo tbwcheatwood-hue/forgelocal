@@ -26,6 +26,7 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 - [AI context window](#ai-context-window)
 - [MCP dock](#mcp-dock)
 - [Multi-agent teaming](#multi-agent-teaming)
+- [Companion bridge](#companion-bridge)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Token & chat payload parameters](#token--chat-payload-parameters)
 - [Offline behavior](#offline-behavior)
@@ -40,16 +41,17 @@ Inspired by LocalForge, Cline, and Cursor, built around a **forge-ember** look (
 
 ## What you get
 
-| Area          | What it does                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| **IDE**       | Monaco editor with tabs, file tree, search, and Command Cards for approved shell commands     |
-| **Assistant** | Chat against LM Studio (or a remote OpenAI-compatible API you configure)                      |
-| **Context**   | You mark files with `+` — only those files are attached                                       |
-| **Diffs**     | Proposed edits appear as Accept / Reject reviews (ghost layer + assistant cards)              |
-| **Canvas**    | Optional infinite map of the workspace with a focus lens                                      |
-| **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                |
-| **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model) |
-| **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry |
+| Area          | What it does                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| **IDE**       | Monaco editor with tabs, file tree, search, and Command Cards for approved shell commands           |
+| **Assistant** | Chat against LM Studio (or a remote OpenAI-compatible API you configure)                            |
+| **Context**   | You mark files with `+` — only those files are attached                                             |
+| **Diffs**     | Proposed edits appear as Accept / Reject reviews (ghost layer + assistant cards)                    |
+| **Canvas**    | Optional infinite map of the workspace with a focus lens                                            |
+| **MCP dock**  | Configure local **stdio** MCP servers, probe tools, browse the offline catalog                      |
+| **Agents**    | Optional LocalAGI-inspired multi-agent team (explicit opt-in; sequential roles on your model)       |
+| **Companion** | Optional LocalForge Companion bridge, provider discovery, hardware inventory, git snapshot, preview |
+| **Safety**    | Workspace path confinement by default; no silent cloud fallback from local mode; no telemetry       |
 
 The IDE stays in the **main window** (there is no pop-out IDE).
 
@@ -279,6 +281,25 @@ Multi mode never replaces the app shell, never invents a cloud agent pool, and n
 
 ---
 
+## Companion bridge
+
+ForgeLocal can optionally talk to a [LocalForge Companion](https://github.com/) 0.3.2-compatible service and reuses Companion-inspired local tooling — independently implemented for Electron (see `NOTICE`).
+
+| Capability   | What it does                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| **Bridge**   | Health + pairing code → bearer token (stored locally). Default `http://127.0.0.1:7337`. Explicit opt-in. |
+| **Discover** | Probes Ollama / LM Studio / llama.cpp / Lemonade ports; **Use as provider** updates Settings.            |
+| **Hardware** | Real CPU/RAM/GPU/NPU/runtime measurements only — missing probes show “not detected”.                     |
+| **Git**      | Status + recent log for the open workspace.                                                              |
+| **Preview**  | Loopback static file server jailed to the project (`.` / `dist` / …). No LAN bind.                       |
+| **Commands** | Hard-deny vs needs-confirm screening (Companion-style); Command Cards still require approval.            |
+
+Dock → **Companion** / **Preview**. Catalog tools: `optional-companion-bridge`, `optional-provider-discover`, `optional-workspace-preview`.
+
+ForgeLocal does **not** replace its own filesystem with the companion — local Electron FS remains authoritative. Mesh multi-machine orchestration from Companion Phase 2 is not shipped in this bridge.
+
+---
+
 ## End-to-end workflow
 
 1. **Open a project** (Welcome → Open project, or File → Open Project).
@@ -295,6 +316,7 @@ Optional polish (catalog tools, enabled by default for a gift experience):
 - **Intent radial** — right-click / hold / Ctrl+Shift+Space → Extract · Optimize · Tests · Explain
 - **Syntax dimming** — dims lines outside the current selection when enabled
 - **Multi-agent** — LocalAGI-inspired team (explicit opt-in in Agents)
+- **Companion** — optional companion bridge, discovery, hardware, preview
 
 ---
 
@@ -397,7 +419,7 @@ config/            Example settings (no secrets)
 docs/images/       README screenshots
 scripts/           Dev launcher + desktop shortcut installer
 tests/             Vitest unit tests
-NOTICE             Third-party attribution (LocalAGI MIT)
+NOTICE             Third-party attribution (LocalAGI + LocalForge Companion MIT)
 ```
 
 ---
@@ -406,4 +428,4 @@ NOTICE             Third-party attribution (LocalAGI MIT)
 
 MIT
 
-Third-party notices (LocalAGI inspiration): see [`NOTICE`](NOTICE).
+Third-party notices (LocalAGI + LocalForge Companion inspiration): see [`NOTICE`](NOTICE).

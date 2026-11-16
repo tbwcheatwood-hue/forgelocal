@@ -14,6 +14,11 @@ export function StatusBar() {
     <footer className="statusbar" role="contentinfo">
       <span>{workspaceRoot ? 'workspace' : 'idle'}</span>
       {hasGit && settings.enabledTools['vcs-git-status'] !== false && <span>git</span>}
+      {settings.companion?.enabled && (
+        <span title={settings.companion.baseUrl}>
+          companion{settings.companion.token ? '·paired' : ''}
+        </span>
+      )}
       <span>{remote ? 'remote' : 'local'}</span>
       <span>{settings.provider.model || 'no model'}</span>
       <span className="status-line">

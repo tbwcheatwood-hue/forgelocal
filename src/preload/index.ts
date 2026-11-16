@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
 import type { AgentRole } from '../shared/agents'
+import type {
+  CompanionHealth,
+  CompanionPairResult,
+  DiscoveredProvider,
+  GitSnapshot,
+  HardwareInventory
+} from '../shared/companion'
+import type { McpServerConfig, McpServerProbeResult } from '../shared/mcp'
 import type {
   AppSettings,
   CatalogFilter,
@@ -69,10 +76,30 @@ export interface ForgeApi {
   runApprovedCommand: (payload: {
     command: string
     cwd?: string
+    confirm?: boolean
   }) => Promise<
     | { ok: true; code: number; stdout: string; stderr: string }
-    | { ok: false; error?: string; stdout?: string; stderr?: string }
+    | { ok: false; error?: string; stdout?: string; stderr?: string; needsConfirm?: boolean }
   >
+  companionHealth: () => Promise<CompanionHealth>
+  companionPair: (code: string) => Promise<CompanionPairResult>
+  companionDisconnect: () => Promise<AppSettings>
+  companionWorkspaces: () => Promise<{
+    ok: boolean
+    status?: number
+    json?: unknown
+    error?: string
+  }>
+  discoverProviders: (extraUrls?: string[]) => Promise<DiscoveredProvider[]>
+  hardwareInventory: () => Promise<HardwareInventory>
+  gitSnapshot: () => Promise<GitSnapshot>
+  previewStart: (
+    previewDir?: string
+  ) => Promise<
+    { ok: true; url: string; token: string; root: string } | { ok: false; message: string }
+  >
+  previewStop: () => Promise<{ ok: true }>
+  previewStatus: () => Promise<{ active: boolean; url?: string; root?: string }>
   onTerminalData: (
     cb: (payload: { stream: 'stdout' | 'stderr'; data: string }) => void
   ) => () => void
@@ -122,6 +149,16 @@ const api: ForgeApi = {
   saveChatSession: (session) => ipcRenderer.invoke('chat:save', session),
   deleteChatSession: (id) => ipcRenderer.invoke('chat:delete', id),
   runApprovedCommand: (payload) => ipcRenderer.invoke('terminal:runApproved', payload),
+  companionHealth: () => ipcRenderer.invoke('companion:health'),
+  companionPair: (code) => ipcRenderer.invoke('companion:pair', code),
+  companionDisconnect: () => ipcRenderer.invoke('companion:disconnect'),
+  companionWorkspaces: () => ipcRenderer.invoke('companion:workspaces'),
+  discoverProviders: (extraUrls) => ipcRenderer.invoke('providers:discover', extraUrls),
+  hardwareInventory: () => ipcRenderer.invoke('hardware:inventory'),
+  gitSnapshot: () => ipcRenderer.invoke('git:snapshot'),
+  previewStart: (previewDir) => ipcRenderer.invoke('preview:start', previewDir),
+  previewStop: () => ipcRenderer.invoke('preview:stop'),
+  previewStatus: () => ipcRenderer.invoke('preview:status'),
   onTerminalData: (cb) => {
     const listener = (
       _: Electron.IpcRendererEvent,
